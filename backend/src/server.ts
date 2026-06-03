@@ -1,18 +1,29 @@
-import express from "express";
 import dotenv from "dotenv";
-
 dotenv.config();
 
+import express from "express";
+import authRoutes from "./modules/auth/auth.routes.js";
+import cors from "cors";
+
 const app = express();
-
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({ message: "Backend is running 🚀" });
-});
-
 const PORT = process.env.PORT || 5000;
 
+app.use(express.json());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
+
+// Routes
+app.use("/api/auth", authRoutes);
+
+// Health check
+app.get("/", (req, res) => {
+  res.json({ status: "OK", message: "IELTS API running" });
+});
+
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
