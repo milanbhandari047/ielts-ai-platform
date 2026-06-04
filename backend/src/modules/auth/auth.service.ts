@@ -19,10 +19,9 @@ import type { ChangePasswordDTO } from "./dto/change-password.dto.js";
 import { prisma } from "../../config/db.js";
 import { getGoogleOAuthTokens, getGoogleUser } from "./oauth/google-oauth.js";
 
-// Single shared instance — no need to re-instantiate on every call
-const emailService = new EmailService();
-
 export class AuthService {
+  private emailService = new EmailService();
+
   // ─────────────────────────────────────────
   // REGISTER
   // ─────────────────────────────────────────
@@ -42,7 +41,7 @@ export class AuthService {
         email: data.email,
         password,
         emailVerifyToken: hashToken(verifyToken),
-        emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
         emailVerified: false,
       },
     });
@@ -55,12 +54,10 @@ export class AuthService {
 
     await storeRefreshToken(user.id, tokens.refreshToken);
 
-    // Send verification email — fire and forget, don't block registration
-    emailService
+    this.emailService
       .sendVerificationEmail(user.email, user.name, verifyToken)
       .catch((err) => console.error("Failed to send verification email:", err));
 
-    // Strip password from returned user object — never expose it
     const { password: _, ...safeUser } = user;
 
     return { user: safeUser, tokens };
@@ -74,8 +71,6 @@ export class AuthService {
       where: { email: data.email },
     });
 
-    // Same error message for both "user not found" and "wrong password"
-    // to avoid leaking which emails are registered
     if (!user) throw new Error("Invalid credentials");
 
     const valid = verifyPassword(data.password, user.password!);
@@ -117,8 +112,6 @@ export class AuthService {
   // ─────────────────────────────────────────
   // PROFILE
   // ─────────────────────────────────────────
-
-  // FIX: was named profile() — controller calls getProfile(), now consistent
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -141,7 +134,7 @@ export class AuthService {
   }
 
   // ─────────────────────────────────────────
-  // EMAIL VERIFY
+  // VERIFY EMAIL
   // ─────────────────────────────────────────
   async verifyEmail(token: string) {
     const hashed = hashToken(token);
@@ -168,7 +161,16 @@ export class AuthService {
       },
     });
 
-    return { message: "Email verified successfully" };
+    // ✅ Return tokens so frontend can auto-login from any tab
+    const tokens = generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    await storeRefreshToken(user.id, tokens.refreshToken);
+
+    return { message: "Email verified successfully", tokens };
   }
 
   // ─────────────────────────────────────────
@@ -186,11 +188,11 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerifyToken: hashToken(verifyToken),
-        emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 
-    await emailService.sendVerificationEmail(
+    await this.emailService.sendVerificationEmail(
       user.email,
       user.name,
       verifyToken
@@ -207,7 +209,6 @@ export class AuthService {
       where: { email: data.email },
     });
 
-    // Always return the same message — don't reveal whether the email exists
     if (!user) {
       return {
         message: "If that email is registered, a reset link has been sent",
@@ -220,18 +221,16 @@ export class AuthService {
       data: {
         userId: user.id,
         token: hashToken(token),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
 
-    // Send reset email — fire and forget
-    emailService
+    this.emailService
       .sendPasswordResetEmail(user.email, user.name, token)
       .catch((err) =>
         console.error("Failed to send password reset email:", err)
       );
 
-    // FIX: raw token removed from response — it now only goes via email
     return {
       message: "If that email is registered, a reset link has been sent",
     };
@@ -253,14 +252,14 @@ export class AuthService {
 
     if (!record) throw new Error("Invalid or expired reset token");
 
-    const user = await prisma.user.findUnique({ where: { id: record.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: record.userId },
+    });
     if (!user) throw new Error("User not found");
-
-    const newPassword = hashPassword(data.newPassword);
 
     await prisma.user.update({
       where: { id: record.userId },
-      data: { password: newPassword },
+      data: { password: hashPassword(data.newPassword) },
     });
 
     await prisma.passwordReset.update({
@@ -268,11 +267,9 @@ export class AuthService {
       data: { used: true },
     });
 
-    // Revoke all sessions — user must log in again after resetting
     await revokeAllTokensForUser(record.userId);
 
-    // Notify user that password was changed
-    emailService
+    this.emailService
       .sendPasswordChangedEmail(user.email, user.name)
       .catch((err) =>
         console.error("Failed to send password changed email:", err)
@@ -284,15 +281,11 @@ export class AuthService {
   // ─────────────────────────────────────────
   // CHANGE PASSWORD
   // ─────────────────────────────────────────
-
-  // FIX: DTO field was "oldPassword" in service but "currentPassword" in validator.
-  // Standardised to "currentPassword" here — update ChangePasswordDTO to match.
   async changePassword(userId: string, data: ChangePasswordDTO) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) throw new Error("User not found");
 
-    // OAuth users may have no password set
     if (!user.password) {
       throw new Error("No password set. Please use your social login.");
     }
@@ -309,11 +302,9 @@ export class AuthService {
       data: { password: hashPassword(data.newPassword) },
     });
 
-    // Revoke all other sessions — force re-login on other devices
     await revokeAllTokensForUser(userId);
 
-    // Notify user
-    emailService
+    this.emailService
       .sendPasswordChangedEmail(user.email, user.name)
       .catch((err) =>
         console.error("Failed to send password changed email:", err)
@@ -323,7 +314,7 @@ export class AuthService {
   }
 
   // ─────────────────────────────────────────
-  // GOOGLE OAUTH URL
+  // GOOGLE OAUTH — GET URL
   // ─────────────────────────────────────────
   getGoogleOAuthUrl(redirectUri: string) {
     const root = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -341,7 +332,7 @@ export class AuthService {
   }
 
   // ─────────────────────────────────────────
-  // GOOGLE OAUTH CALLBACK
+  // GOOGLE OAUTH — CALLBACK
   // ─────────────────────────────────────────
   async googleOAuthCallback(code: string, redirectUri: string) {
     const tokensResponse = await getGoogleOAuthTokens(code, redirectUri);
@@ -353,18 +344,15 @@ export class AuthService {
     const googleUser = await getGoogleUser(tokensResponse.id_token);
 
     const { id: oauthId, email, name, picture, verified_email } = googleUser;
-    if (!email) {
-      throw new Error("Google account has no email");
-    }
 
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
+    if (!email) throw new Error("Google account has no email");
+
+    let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          id: oauthId, // Use Google ID as user ID to ensure uniqueness
+          id: oauthId,
           email,
           name,
           avatar: picture ?? null,
@@ -394,9 +382,6 @@ export class AuthService {
 
     const { password: _, ...safeUser } = user;
 
-    return {
-      user: safeUser,
-      tokens,
-    };
+    return { user: safeUser, tokens };
   }
 }

@@ -7,18 +7,16 @@ import type { ResetPasswordDTO } from "./dto/reset-password.dto.js";
 import type { ChangePasswordDTO } from "./dto/change-password.dto.js";
 import { AuthService } from "./auth.service.js";
 
-const authService = new AuthService();
-
 export class AuthController {
+  private authService = new AuthService();
+
   // ─────────────────────────────────────────────
   // Register
   // ─────────────────────────────────────────────
-
   async register(req: Request, res: Response) {
     try {
       const data: RegisterDTO = req.body;
-
-      const result = await authService.register(data);
+      const result = await this.authService.register(data);
 
       return res.status(201).json({
         success: true,
@@ -27,22 +25,17 @@ export class AuthController {
         data: result,
       });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Login
   // ─────────────────────────────────────────────
-
   async login(req: Request, res: Response) {
     try {
       const data: LoginDTO = req.body;
-
-      const result = await authService.login(data);
+      const result = await this.authService.login(data);
 
       return res.status(200).json({
         success: true,
@@ -50,17 +43,13 @@ export class AuthController {
         data: result,
       });
     } catch (error: any) {
-      return res.status(401).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(401).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Refresh Token
   // ─────────────────────────────────────────────
-
   async refresh(req: Request, res: Response) {
     try {
       const { refreshToken } = req.body;
@@ -72,24 +61,17 @@ export class AuthController {
         });
       }
 
-      const tokens = await authService.refreshToken(refreshToken);
+      const tokens = await this.authService.refreshToken(refreshToken);
 
-      return res.status(200).json({
-        success: true,
-        data: tokens,
-      });
+      return res.status(200).json({ success: true, data: tokens });
     } catch (error: any) {
-      return res.status(401).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(401).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Logout
   // ─────────────────────────────────────────────
-
   async logout(req: Request, res: Response) {
     try {
       const { refreshToken } = req.body;
@@ -101,68 +83,45 @@ export class AuthController {
         });
       }
 
-      const result = await authService.logout(refreshToken);
+      const result = await this.authService.logout(refreshToken);
 
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Logout All Devices
   // ─────────────────────────────────────────────
-
   async logoutAll(req: Request, res: Response) {
     try {
       const userId = req.user!.userId;
+      const result = await this.authService.logoutAll(userId);
 
-      const result = await authService.logoutAll(userId);
-
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Get Profile
   // ─────────────────────────────────────────────
-
   async getMe(req: Request, res: Response) {
     try {
       const userId = req.user!.userId;
+      const user = await this.authService.getProfile(userId);
 
-      const user = await authService.getProfile(userId);
-
-      return res.status(200).json({
-        success: true,
-        data: user,
-      });
+      return res.status(200).json({ success: true, data: user });
     } catch (error: any) {
-      return res.status(404).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(404).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Verify Email
   // ─────────────────────────────────────────────
-
   async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.query;
@@ -174,122 +133,84 @@ export class AuthController {
         });
       }
 
-      const result = await authService.verifyEmail(token);
+      const result = await this.authService.verifyEmail(token);
 
       return res.status(200).json({
         success: true,
-        ...result,
+        ...result, // spreads { message, tokens? }
       });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Resend Verification Email
   // ─────────────────────────────────────────────
-
   async resendVerification(req: Request, res: Response) {
     try {
       const userId = req.user!.userId;
+      const result = await this.authService.resendVerification(userId);
 
-      const result = await authService.resendVerification(userId);
-
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      // 409 Conflict if already verified, 400 for everything else
       const status = error.message === "Email is already verified" ? 409 : 400;
-
-      return res.status(status).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(status)
+        .json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Forgot Password
   // ─────────────────────────────────────────────
-
   async forgotPassword(req: Request, res: Response) {
     try {
       const data: ForgotPasswordDTO = req.body;
+      const result = await this.authService.forgotPassword(data);
 
-      const result = await authService.forgotPassword(data);
-
-      // Always 200 — never reveal whether the email exists
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Reset Password
   // ─────────────────────────────────────────────
-
   async resetPassword(req: Request, res: Response) {
     try {
       const data: ResetPasswordDTO = req.body;
+      const result = await this.authService.resetPassword(data);
 
-      const result = await authService.resetPassword(data);
-
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Change Password
   // ─────────────────────────────────────────────
-
   async changePassword(req: Request, res: Response) {
     try {
       const userId = req.user!.userId;
       const data: ChangePasswordDTO = req.body;
+      const result = await this.authService.changePassword(userId, data);
 
-      const result = await authService.changePassword(userId, data);
-
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
+      return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
   // ─────────────────────────────────────────────
   // Google OAuth — Redirect
   // ─────────────────────────────────────────────
-
   async googleOAuthRedirect(req: Request, res: Response) {
     try {
       const redirectUri = `${process.env.SERVER_URL}/auth/oauth/google/callback`;
-
-      const url = authService.getGoogleOAuthUrl(redirectUri);
+      const url = this.authService.getGoogleOAuthUrl(redirectUri);
 
       return res.redirect(url);
     } catch (error: any) {
@@ -303,7 +224,6 @@ export class AuthController {
   // ─────────────────────────────────────────────
   // Google OAuth — Callback
   // ─────────────────────────────────────────────
-
   async googleOAuthCallback(req: Request, res: Response) {
     try {
       const { code } = req.query;
@@ -316,13 +236,11 @@ export class AuthController {
       }
 
       const redirectUri = `${process.env.SERVER_URL}/auth/oauth/google/callback`;
+      const result = await this.authService.googleOAuthCallback(
+        code,
+        redirectUri
+      );
 
-      const result = await authService.googleOAuthCallback(code, redirectUri);
-
-      // Option A — API response (for mobile / SPA clients that handle the callback)
-      // return res.status(200).json({ success: true, data: result });
-
-      // Option B — redirect to frontend with tokens in query params (for web browser flow)
       const { accessToken, refreshToken } = result.tokens;
 
       return res.redirect(

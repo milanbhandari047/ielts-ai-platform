@@ -1,3 +1,9 @@
+import dotenv from "dotenv";
+import path from "path";
+
+// ✅ This MUST run before any process.env access
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+
 export const ENV = {
   // Server
   PORT: Number(process.env.PORT) || 8000,
@@ -10,9 +16,7 @@ export const ENV = {
   JWT_SECRET: process.env.JWT_SECRET!,
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET!,
   JWT_EXPIRES_IN: (process.env.JWT_EXPIRES_IN || "15m") as any,
-  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN as any,
-
-  // JWT_REFRESH_EXPIRES_IN_MS: parseMs(process.env.JWT_REFRESH_EXPIRES_IN, "7d"),
+  JWT_REFRESH_EXPIRES_IN: (process.env.JWT_REFRESH_EXPIRES_IN || "7d") as any,
 
   // Frontend
   CLIENT_URL: process.env.CLIENT_URL!,
@@ -34,3 +38,24 @@ export const ENV = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
 };
+
+// ✅ Crash at startup with a clear message if anything critical is missing
+const required: (keyof typeof ENV)[] = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "CLIENT_URL",
+  "EMAIL_FROM",
+  "SMTP_HOST",
+  "SMTP_USER",
+  "SMTP_PASS",
+];
+
+for (const key of required) {
+  if (!ENV[key]) {
+    throw new Error(
+      `\n❌ Missing required environment variable: ${key}\n` +
+        `   Check your .env file at: ${path.resolve(process.cwd(), ".env")}\n`
+    );
+  }
+}

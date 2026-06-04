@@ -16,14 +16,14 @@ export class EmailService {
   }
 
   async sendVerificationEmail(email: string, name: string, token: string) {
-    const verifyUrl = `${process.env.CLIENT_URL}/auth/verify-email?token=${token}`;
+    const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
     const html = verificationEmailTemplate(name, verifyUrl);
 
     await this.send(email, "Verify your email — IELTS Platform", html);
   }
 
   async sendPasswordResetEmail(email: string, name: string, token: string) {
-    const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}`;
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
     const html = passwordResetEmailTemplate(name, resetUrl);
 
     await this.send(email, "Reset your password — IELTS Platform", html);
