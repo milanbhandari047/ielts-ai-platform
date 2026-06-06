@@ -17,7 +17,6 @@ export class AuthController {
     try {
       const data: RegisterDTO = req.body;
       const result = await this.authService.register(data);
-
       return res.status(201).json({
         success: true,
         message:
@@ -36,7 +35,6 @@ export class AuthController {
     try {
       const data: LoginDTO = req.body;
       const result = await this.authService.login(data);
-
       return res.status(200).json({
         success: true,
         message: "Login successful",
@@ -53,16 +51,12 @@ export class AuthController {
   async refresh(req: Request, res: Response) {
     try {
       const { refreshToken } = req.body;
-
       if (!refreshToken || typeof refreshToken !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Refresh token is required",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Refresh token is required" });
       }
-
       const tokens = await this.authService.refreshToken(refreshToken);
-
       return res.status(200).json({ success: true, data: tokens });
     } catch (error: any) {
       return res.status(401).json({ success: false, message: error.message });
@@ -75,16 +69,12 @@ export class AuthController {
   async logout(req: Request, res: Response) {
     try {
       const { refreshToken } = req.body;
-
       if (!refreshToken || typeof refreshToken !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Refresh token is required",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Refresh token is required" });
       }
-
       const result = await this.authService.logout(refreshToken);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -98,7 +88,6 @@ export class AuthController {
     try {
       const userId = req.user!.userId;
       const result = await this.authService.logoutAll(userId);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -112,7 +101,6 @@ export class AuthController {
     try {
       const userId = req.user!.userId;
       const user = await this.authService.getProfile(userId);
-
       return res.status(200).json({ success: true, data: user });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -121,27 +109,32 @@ export class AuthController {
 
   // ─────────────────────────────────────────────
   // Verify Email
+  // FIX: The controller was emitting a non-standard double-data shape:
+  //   { success, message: result.message, data: result }
+  // where result itself was { message, tokens }.
+  // That made the frontend read tokens from res.data.data.tokens (three levels
+  // deep) while also re-exposing .message at both the top level and inside
+  // .data. Flattened to the standard envelope used everywhere else:
+  //   { success: true, message, data: { tokens } }
   // ─────────────────────────────────────────────
   async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.query;
-      console.log("=================================");
-      console.log("VERIFY EMAIL");
-      console.log("TOKEN FROM URL:", req.query.token);
       if (!token || typeof token !== "string") {
         return res.status(400).json({
           success: false,
           message: "Verification token is required",
         });
       }
-      console.log("=================================");
 
       const result = await this.authService.verifyEmail(token);
 
       return res.status(200).json({
         success: true,
-        message: "Email verified successfully",
-        data: result,
+        message: result.message,
+        data: {
+          tokens: result.tokens, // { accessToken, refreshToken }
+        },
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -155,7 +148,6 @@ export class AuthController {
     try {
       const userId = req.user!.userId;
       const result = await this.authService.resendVerification(userId);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       const status = error.message === "Email is already verified" ? 409 : 400;
@@ -172,7 +164,6 @@ export class AuthController {
     try {
       const data: ForgotPasswordDTO = req.body;
       const result = await this.authService.forgotPassword(data);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -186,7 +177,6 @@ export class AuthController {
     try {
       const data: ResetPasswordDTO = req.body;
       const result = await this.authService.resetPassword(data);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -201,7 +191,6 @@ export class AuthController {
       const userId = req.user!.userId;
       const data: ChangePasswordDTO = req.body;
       const result = await this.authService.changePassword(userId, data);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -215,13 +204,11 @@ export class AuthController {
     try {
       const redirectUri = `${process.env.SERVER_URL}/auth/oauth/google/callback`;
       const url = this.authService.getGoogleOAuthUrl(redirectUri);
-
       return res.redirect(url);
     } catch (error: any) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to initiate Google login",
-      });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to initiate Google login" });
     }
   }
 
@@ -231,22 +218,17 @@ export class AuthController {
   async googleOAuthCallback(req: Request, res: Response) {
     try {
       const { code } = req.query;
-
       if (!code || typeof code !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Authorization code is required",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Authorization code is required" });
       }
-
       const redirectUri = `${process.env.SERVER_URL}/auth/oauth/google/callback`;
       const result = await this.authService.googleOAuthCallback(
         code,
         redirectUri
       );
-
       const { accessToken, refreshToken } = result.tokens;
-
       return res.redirect(
         `${process.env.CLIENT_URL}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`
       );

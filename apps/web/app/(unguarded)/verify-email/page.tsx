@@ -31,14 +31,12 @@ export default function VerifyEmailPage() {
     if (!token) {
       setStatus("error");
       setErrorMsg("Verification token is missing.");
-      console.log("Token from URL:", token);
 
       return;
     }
 
     verifyEmail(token).then(async (res) => {
       if (!res) {
-        console.log("VERIFY RESPONSE:", res);
 
         setStatus("error");
         setErrorMsg("Invalid or expired verification link.");

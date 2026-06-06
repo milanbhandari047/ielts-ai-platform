@@ -6,14 +6,13 @@ import { authService } from "@/services/auth.service";
 
 export function VerificationBanner() {
   const user = useAuthStore((state) => state.user);
-  console.log("Banner user:", user);
   const setUser = useAuthStore((state) => state.setUser);
   const [sent, setSent] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Listen for verification from another tab
+  // Listen for verification completed in another tab
   useEffect(() => {
     if (!user || user.emailVerified) return;
 
@@ -23,12 +22,9 @@ export function VerificationBanner() {
       if (event.data?.verified) {
         try {
           const res = await authService.getMe();
-          // Backend may still return emailVerified: false due to a timing
-          // issue. Since the broadcast only fires on confirmed success,
-          // force the flag to true so the banner disappears correctly.
+          // Trust the broadcast — force flag true even if getMe returns stale data
           setUser({ ...res.data, emailVerified: true });
         } catch {
-          // If getMe fails, still trust the broadcast and patch the store
           if (user) setUser({ ...user, emailVerified: true });
         }
       }
@@ -36,6 +32,27 @@ export function VerificationBanner() {
 
     return () => channel.close();
   }, [user]);
+
+  // FIX: Also poll once on mount in case the store was updated by verifyEmail()
+  // but the component rendered before Zustand flushed the new value.
+  // This is a safety net for the redirect race: page.tsx calls router.replace()
+  // inside a setTimeout(1500ms), so the dashboard mounts before verifyEmail's
+  // setUser() has run. Re-fetching here guarantees the banner disappears.
+  useEffect(() => {
+    if (!user || user.emailVerified) return;
+
+    authService
+      .getMe()
+      .then((res) => {
+        if (res.data.emailVerified) {
+          setUser({ ...res.data, emailVerified: true });
+        }
+      })
+      .catch(() => {
+        // Silently ignore — banner will stay visible which is correct
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount
 
   if (!user || user.emailVerified || dismissed) return null;
 

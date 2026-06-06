@@ -161,6 +161,10 @@ export class AuthService {
       },
     });
 
+    this.emailService
+      .sendEmailVerifiedEmail(user.email, user.name)
+      .catch((err) => console.error("Failed to send verified email:", err));
+
     // ✅ Return tokens so frontend can auto-login from any tab
     const tokens = generateTokens({
       userId: user.id,

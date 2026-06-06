@@ -1,4 +1,5 @@
 import { transporter } from "./mailer.config.js";
+import { emailVerifiedTemplate } from "./templates/email-verified.template.js";
 import {
   verificationEmailTemplate,
   passwordResetEmailTemplate,
@@ -33,5 +34,10 @@ export class EmailService {
     const html = passwordChangedEmailTemplate(name);
 
     await this.send(email, "Your password was changed — IELTS Platform", html);
+  }
+
+  async sendEmailVerifiedEmail(email: string, name: string) {
+    const html = emailVerifiedTemplate(name);
+    await this.send(email, "Email verified — IELTS Platform", html);
   }
 }

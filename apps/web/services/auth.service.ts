@@ -16,11 +16,8 @@ class AuthService {
 
   async register(data: RegisterDTO): Promise<AuthResponse> {
     const res = await api.post<AuthResponse>("/auth/register", data);
-
-    // Store tokens immediately so user is logged in after registration
     const { accessToken, refreshToken } = res.data.data.tokens;
     tokenStorage.setTokens(accessToken, refreshToken);
-
     return res.data;
   }
 
@@ -28,10 +25,8 @@ class AuthService {
 
   async login(data: LoginDTO): Promise<AuthResponse> {
     const res = await api.post<AuthResponse>("/auth/login", data);
-
     const { accessToken, refreshToken } = res.data.data.tokens;
     tokenStorage.setTokens(accessToken, refreshToken);
-
     return res.data;
   }
 
@@ -40,14 +35,11 @@ class AuthService {
   async refresh(): Promise<TokensResponse> {
     const refreshToken = tokenStorage.getRefresh();
     if (!refreshToken) throw new Error("No refresh token");
-
     const res = await api.post<TokensResponse>("/auth/refresh", {
       refreshToken,
     });
-
     const { accessToken, refreshToken: newRefresh } = res.data.data;
     tokenStorage.setTokens(accessToken, newRefresh);
-
     return res.data;
   }
 
@@ -55,14 +47,12 @@ class AuthService {
 
   async logout(): Promise<void> {
     const refreshToken = tokenStorage.getRefresh();
-
     try {
-      // Tell backend to revoke this refresh token
       if (refreshToken) {
         await api.post("/auth/logout", { refreshToken });
       }
     } catch {
-      // Even if the call fails, clear local tokens
+      // Clear local tokens even if server call fails
     } finally {
       tokenStorage.clear();
     }
@@ -84,23 +74,17 @@ class AuthService {
   }
 
   // ─── Verify Email ─────────────────────────────────────────────────────────
-
+  // FIX: Removed the duplicate tokenStorage.setTokens call that used to live
+  // here. Token persistence is now the single responsibility of useAuth's
+  // verifyEmail(), which calls this method and then stores tokens. Having two
+  // writers caused a race: if useAuth's fetchMeRaw() ran between the two
+  // setTokens calls it could use a stale (or absent) token.
+  // This method now just fetches and returns the raw backend envelope.
   async verifyEmail(token: string): Promise<any> {
     const res = await api.get(`/auth/verify-email?token=${token}`);
-    console.log("RAW API RESPONSE:", res.data);
-
-    if (
-      res.data?.data?.tokens?.accessToken &&
-      res.data?.data?.tokens?.refreshToken
-    ) {
-      tokenStorage.setTokens(
-        res.data.data.tokens.accessToken,
-        res.data.data.tokens.refreshToken
-      );
-    }
-
     return res.data;
   }
+
   // ─── Resend Verification ──────────────────────────────────────────────────
 
   async resendVerification(): Promise<MessageResponse> {
@@ -126,17 +110,15 @@ class AuthService {
 
   async changePassword(data: ChangePasswordDTO): Promise<MessageResponse> {
     const res = await api.post<MessageResponse>("/auth/change-password", data);
-    // Revoke local tokens — backend revokes all sessions
     tokenStorage.clear();
     return res.data;
   }
 
-  // ─── Google OAuth (browser redirect flow) ────────────────────────────────
+  // ─── Google OAuth ─────────────────────────────────────────────────────────
 
   initiateGoogleOAuth(): void {
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/oauth/google`;
   }
 }
 
-// Singleton export
 export const authService = new AuthService();
