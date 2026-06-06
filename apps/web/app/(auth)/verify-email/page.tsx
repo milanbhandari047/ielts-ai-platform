@@ -2,42 +2,61 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthStore } from "@/store/auth.store";
+import { useSearchParams, useRouter } from "next/navigation";
+
+// inside component
 
 type Status = "verifying" | "success" | "error" | "already_verified";
 
 export default function VerifyEmailPage() {
+  const router = useRouter();
+
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  const { verifyEmail, resendVerification, isLoading } = useAuth();
-  const { isAuthenticated } = useAuthStore();
 
+  // Debug log to check token value
+
+  const { verifyEmail, resendVerification, isLoading } = useAuth();
   const [status, setStatus] = useState<Status>("verifying");
   const [errorMsg, setErrorMsg] = useState("");
   const [resentSuccess, setResentSuccess] = useState(false);
   const ran = useRef(false);
+  // app/verify-email/page.tsx  (or wherever your VerifyEmailPage is)
 
   useEffect(() => {
-    // Strict mode double-invoke guard
     if (ran.current) return;
     ran.current = true;
 
     if (!token) {
       setStatus("error");
       setErrorMsg("Verification token is missing.");
+      console.log("Token from URL:", token);
+
       return;
     }
 
-    verifyEmail(token).then((res) => {
+    verifyEmail(token).then(async (res) => {
       if (!res) {
+        console.log("VERIFY RESPONSE:", res);
+
         setStatus("error");
         setErrorMsg("Invalid or expired verification link.");
       } else if (res.message === "Email already verified") {
         setStatus("already_verified");
       } else {
         setStatus("success");
+
+        // Notify other tabs (e.g. dashboard showing the verification banner)
+        const channel = new BroadcastChannel("email_verification");
+        channel.postMessage({ verified: true });
+        channel.close();
+
+        // verifyEmail() already called fetchMeRaw() internally and updated
+        // the store with the fresh user (emailVerified: true). Zustand's
+        // persist middleware will sync localStorage automatically — no
+        // manual write needed. Just redirect.
+        router.replace("/dashboard");
       }
     });
   }, []);
@@ -132,20 +151,18 @@ export default function VerifyEmailPage() {
             New verification email sent! Check your inbox.
           </p>
         ) : (
-          isAuthenticated && (
-            <button
-              onClick={handleResend}
-              disabled={isLoading}
-              className="mt-4 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {isLoading ? "Sending…" : "Resend verification email"}
-            </button>
-          )
+          <button
+            onClick={handleResend}
+            disabled={isLoading}
+            className="mt-4 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {isLoading ? "Sending…" : "Resend verification email"}
+          </button>
         )}
 
         <div className="mt-4">
           <Link
-            href="/auth/login"
+            href="/login"
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
           >
             ← Back to sign in

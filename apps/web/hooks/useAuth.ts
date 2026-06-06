@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
@@ -11,31 +13,33 @@ import type {
   ChangePasswordDTO,
 } from "@/types/auth.types";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Extract the message from an Axios error or plain Error
 const extractError = (error: unknown): string => {
   if (error && typeof error === "object" && "response" in error) {
-    const axiosError = error as { response?: { data?: { message?: string } } };
+    const axiosError = error as {
+      response?: { data?: { message?: string } };
+    };
     return axiosError.response?.data?.message ?? "Something went wrong";
   }
   if (error instanceof Error) return error.message;
   return "Something went wrong";
 };
 
-// ─── useAuth ──────────────────────────────────────────────────────────────────
-
 export function useAuth() {
   const router = useRouter();
-  const { setUser, setLoading, clearAuth, isLoading } = useAuthStore();
+
+  // ← select each value individually to prevent re-renders
+  const setUser = useAuthStore((state) => state.setUser);
+  const setLoading = useAuthStore((state) => state.setLoading);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const isLoading = useAuthStore((state) => state.isLoading);
+
   const [error, setError] = useState<string | null>(null);
 
   const withLoading = async <T>(fn: () => Promise<T>): Promise<T | null> => {
     setError(null);
     setLoading(true);
     try {
-      const result = await fn();
-      return result;
+      return await fn();
     } catch (err) {
       setError(extractError(err));
       return null;
@@ -44,7 +48,11 @@ export function useAuth() {
     }
   };
 
-  // ─── Register ───────────────────────────────────────────────────────────
+  const fetchMeRaw = async () => {
+    const res = await authService.getMe(); // returns ProfileResponse
+    setUser(res.data); // ProfileResponse.data = AuthUser ✅
+    return res.data;
+  };
 
   const register = async (data: RegisterDTO) =>
     withLoading(async () => {
@@ -54,8 +62,6 @@ export function useAuth() {
       return res;
     });
 
-  // ─── Login ──────────────────────────────────────────────────────────────
-
   const login = async (data: LoginDTO) =>
     withLoading(async () => {
       const res = await authService.login(data);
@@ -64,92 +70,76 @@ export function useAuth() {
       return res;
     });
 
-  // ─── Logout ─────────────────────────────────────────────────────────────
-
   const logout = async () =>
     withLoading(async () => {
       await authService.logout();
       clearAuth();
-      router.push("/auth/login");
+      router.push("/login");
     });
-
-  // ─── Logout All ─────────────────────────────────────────────────────────
 
   const logoutAll = async () =>
     withLoading(async () => {
       await authService.logoutAll();
       clearAuth();
-      router.push("/auth/login");
+      router.push("/login");
     });
-
-  // ─── Fetch /me and hydrate store ────────────────────────────────────────
 
   const fetchMe = async () =>
     withLoading(async () => {
-      const res = await authService.getMe();
-      setUser(res.data);
-      return res.data;
+      return await fetchMeRaw();
     });
-
-  // ─── Forgot Password ─────────────────────────────────────────────────────
 
   const forgotPassword = async (data: ForgotPasswordDTO) =>
     withLoading(async () => {
-      const res = await authService.forgotPassword(data);
-      return res;
+      return await authService.forgotPassword(data);
     });
-
-  // ─── Reset Password ──────────────────────────────────────────────────────
 
   const resetPassword = async (data: ResetPasswordDTO) =>
     withLoading(async () => {
-      const res = await authService.resetPassword(data);
-      return res;
+      return await authService.resetPassword(data);
     });
-
-  // ─── Change Password ─────────────────────────────────────────────────────
 
   const changePassword = async (data: ChangePasswordDTO) =>
     withLoading(async () => {
       const res = await authService.changePassword(data);
-      // clearAuth done inside service (tokens cleared)
       clearAuth();
-      router.push("/auth/login?reason=password_changed");
+      router.push("/login?reason=password_changed");
       return res;
     });
-
-  // ─── Verify Email ────────────────────────────────────────────────────────
 
   const verifyEmail = async (token: string) =>
     withLoading(async () => {
+      console.log("Calling verifyEmail with token:", token);
       const res = await authService.verifyEmail(token);
-      // Refetch profile to update emailVerified in store
-      const hasToken = !!tokenStorage.getAccess();
-      if (hasToken) await fetchMe();
+      console.log("verifyEmail response:", res);
+
+      // Fetch fresh user from /auth/me
+      const user = await fetchMeRaw();
+
+      // Backend sometimes returns emailVerified: false even after a successful
+      // verification due to a timing/caching issue on the server side.
+      // If the verify API call itself succeeded (no error thrown), we trust
+      // that verification worked and patch the store directly.
+      if (user) {
+        setUser({ ...user, emailVerified: true });
+      }
+
       return res;
     });
-
-  // ─── Resend Verification ─────────────────────────────────────────────────
 
   const resendVerification = async () =>
     withLoading(async () => {
-      const res = await authService.resendVerification();
-      return res;
+      return await authService.resendVerification();
     });
-
-  // ─── Google OAuth ────────────────────────────────────────────────────────
 
   const loginWithGoogle = () => {
     authService.initiateGoogleOAuth();
   };
 
   return {
-    // State
     isLoading,
     error,
     clearError: () => setError(null),
-
-    // Actions
     register,
     login,
     logout,

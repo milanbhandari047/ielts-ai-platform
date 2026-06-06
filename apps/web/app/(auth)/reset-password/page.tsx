@@ -63,7 +63,7 @@ export default function ResetPasswordPage() {
             This link is missing the reset token.
           </p>
           <Link
-            href="/auth/forgot-password"
+            href="/forgot-password"
             className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
           >
             Request a new link
@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
             devices.
           </p>
           <Link
-            href="/auth/login"
+            href="/login"
             className="mt-5 inline-block rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
             Sign in
@@ -124,7 +124,7 @@ export default function ResetPasswordPage() {
               {error}
               {error.includes("expired") && (
                 <Link
-                  href="/auth/forgot-password"
+                  href="/forgot-password"
                   className="ml-1 font-medium underline"
                 >
                   Request a new link

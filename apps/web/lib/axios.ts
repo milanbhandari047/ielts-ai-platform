@@ -91,7 +91,7 @@ api.interceptors.response.use(
 
     if (!refreshToken) {
       tokenStorage.clear();
-      window.location.href = "/auth/login?session=expired";
+      window.location.href = "/login?session=expired";
       return Promise.reject(error);
     }
 
@@ -115,7 +115,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError as Error, null);
       tokenStorage.clear();
-      window.location.href = "/auth/login?session=expired";
+      window.location.href = "/login?session=expired";
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

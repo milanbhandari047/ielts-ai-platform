@@ -24,24 +24,21 @@ export const useAuthStore = create<AuthState>()(
       isHydrated: false,
 
       setUser: (user) => set({ user, isAuthenticated: true, isLoading: false }),
-
       setLoading: (isLoading) => set({ isLoading }),
-
       setHydrated: (isHydrated) => set({ isHydrated }),
-
-      clearAuth: () =>
-        set({ user: null, isAuthenticated: false, isLoading: false }),
+      clearAuth: () => set({ user: null, isAuthenticated: false }),
     }),
     {
       name: "auth-storage",
       storage: createJSONStorage(() => localStorage),
-      // Only persist user — tokens live in their own localStorage keys
       partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
+        user: state.user, // ← real value, no emailVerified hack
       }),
       onRehydrateStorage: () => (state) => {
-        state?.setHydrated(true);
+        if (state) {
+          state.isAuthenticated = !!state.user; // ← derive it
+          state.setHydrated(true);
+        }
       },
     }
   )

@@ -125,19 +125,23 @@ export class AuthController {
   async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.query;
-
+      console.log("=================================");
+      console.log("VERIFY EMAIL");
+      console.log("TOKEN FROM URL:", req.query.token);
       if (!token || typeof token !== "string") {
         return res.status(400).json({
           success: false,
           message: "Verification token is required",
         });
       }
+      console.log("=================================");
 
       const result = await this.authService.verifyEmail(token);
 
       return res.status(200).json({
         success: true,
-        ...result, // spreads { message, tokens? }
+        message: "Email verified successfully",
+        data: result,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });

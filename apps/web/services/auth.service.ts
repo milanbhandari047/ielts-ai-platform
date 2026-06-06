@@ -85,13 +85,22 @@ class AuthService {
 
   // ─── Verify Email ─────────────────────────────────────────────────────────
 
-  async verifyEmail(token: string): Promise<MessageResponse> {
-    const res = await api.get<MessageResponse>(
-      `/auth/verify-email?token=${token}`
-    );
+  async verifyEmail(token: string): Promise<any> {
+    const res = await api.get(`/auth/verify-email?token=${token}`);
+    console.log("RAW API RESPONSE:", res.data);
+
+    if (
+      res.data?.data?.tokens?.accessToken &&
+      res.data?.data?.tokens?.refreshToken
+    ) {
+      tokenStorage.setTokens(
+        res.data.data.tokens.accessToken,
+        res.data.data.tokens.refreshToken
+      );
+    }
+
     return res.data;
   }
-
   // ─── Resend Verification ──────────────────────────────────────────────────
 
   async resendVerification(): Promise<MessageResponse> {

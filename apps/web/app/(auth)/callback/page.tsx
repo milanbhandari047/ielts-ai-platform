@@ -23,12 +23,12 @@ export default function OAuthCallbackPage() {
     const oauthError = searchParams.get("error");
 
     if (oauthError) {
-      router.replace(`/auth/login?error=${encodeURIComponent(oauthError)}`);
+      router.replace(`/login?error=${encodeURIComponent(oauthError)}`);
       return;
     }
 
     if (!accessToken || !refreshToken) {
-      router.replace("/auth/login?error=oauth_failed");
+      router.replace("/login?error=oauth_failed");
       return;
     }
 
@@ -42,7 +42,7 @@ export default function OAuthCallbackPage() {
       })
       .catch(() => {
         tokenStorage.clear();
-        router.replace("/auth/login?error=oauth_failed");
+        router.replace("/login?error=oauth_failed");
       });
   }, []);
 
