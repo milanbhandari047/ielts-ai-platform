@@ -34,6 +34,7 @@ export const authenticate = (
       return res.status(401).json({
         success: false,
         message: "No token provided",
+        code: "NO_TOKEN",
       });
     }
 
@@ -43,18 +44,29 @@ export const authenticate = (
       return res.status(401).json({
         success: false,
         message: "Token missing",
+        code: "NO_TOKEN",
       });
     }
 
-    const payload = jwt.verify(token, ENV.JWT_SECRET) as unknown as JwtPayload;
+    const payload = jwt.verify(token, ENV.JWT_SECRET) as JwtPayload;
 
     req.user = payload;
 
     next();
-  } catch {
+  } catch (err: any) {
+    // ⭐ IMPORTANT FIX
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Access token expired",
+        code: "TOKEN_EXPIRED",
+      });
+    }
+
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token",
+      message: "Invalid token",
+      code: "INVALID_TOKEN",
     });
   }
 };
@@ -66,7 +78,7 @@ export const authenticate = (
 
 export const authorize = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
+    if (!req.user?.role) {
       return res.status(401).json({
         success: false,
         message: "Not authenticated",
@@ -76,7 +88,7 @@ export const authorize = (...roles: string[]) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to access this resource",
+        message: "Forbidden",
       });
     }
 

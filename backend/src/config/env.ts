@@ -37,6 +37,21 @@ export const ENV = {
   // Google OAuth
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
+
+  //API KEY
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY!,
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY!,
+  GROQ_API_KEY: process.env.GROQ_API_KEY!,
+
+  //ADMIN
+  ADMIN_NAME: process.env.ADMIN_NAME!,
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL!,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD!,
+
+  // STUDENT
+  STUDENT_NAME: process.env.STUDENT_NAME!,
+  STUDENT_EMAIL: process.env.STUDENT_EMAIL!,
+  STUDENT_PASSWORD: process.env.STUDENT_PASSWORD!,
 };
 
 // ✅ Crash at startup with a clear message if anything critical is missing
@@ -49,6 +64,9 @@ const required: (keyof typeof ENV)[] = [
   "SMTP_HOST",
   "SMTP_USER",
   "SMTP_PASS",
+  "GROQ_API_KEY",
+  "GEMINI_API_KEY",
+  "OPENROUTER_API_KEY",
 ];
 
 for (const key of required) {

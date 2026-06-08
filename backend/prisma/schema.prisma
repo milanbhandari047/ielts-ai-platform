@@ -7,9 +7,514 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-////////////////////////////////////////////////////
-// ENUMS
-////////////////////////////////////////////////////
+model User {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  password            String?
+  avatar              String?
+  role                Role                 @default(STUDENT)
+  targetBand          Float?
+  streak              Int                  @default(0)
+  lastActiveAt        DateTime?
+  emailVerified       Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  emailVerifyExpiry   DateTime?
+  emailVerifyToken    String?
+  oauthId             String?
+  oauthProvider       OAuthProvider?
+  aiSessions          AiTutorSession[]
+  bandHistory         BandHistory[]
+  comments            CommunityComment[]
+  communityPosts      CommunityPost[]
+  leaderboard         LeaderboardEntry?
+  listeningAttempts   ListeningAttempt[]
+  mockSessions        MockTestSession[]
+  notifications       Notification[]
+  passwordResets      PasswordReset[]
+  payments            Payment[]
+  postBookmarks       PostBookmark[]
+  postLikes           PostLike[]
+  postReports         PostReport[]
+  readingAttempts     ReadingAttempt[]
+  refreshTokens       RefreshToken[]
+  savedWords          SavedWord[]
+  speakingSubmissions SpeakingSubmission[]
+  studyGoals          StudyGoal[]
+  subscription        Subscription?
+  analytics           UserAnalytics?
+  profile             UserProfile?
+  vocabularyProgress  VocabularyProgress[]
+  writingSubmissions  WritingSubmission[]
+
+  @@map("users")
+}
+
+model SavedWord {
+  id           String     @id @default(cuid())
+  userId       String
+  vocabularyId String
+  notes        String?
+  createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary   Vocabulary @relation(fields: [vocabularyId], references: [id])
+
+  @@unique([userId, vocabularyId])
+  @@map("saved_words")
+}
+
+model UserProfile {
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  bio      String?
+  country  String?
+  phone    String?
+  language String  @default("en")
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  tokenHash String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(TRIAL)
+  stripeCustomerId String?
+  stripeSubId      String?
+  endAt            DateTime?
+  startAt          DateTime?
+  payments         Payment[]
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  userId            String
+  subscriptionId    String?
+  amount            Float
+  currency          String          @default("USD")
+  status            PaymentStatus   @default(PENDING)
+  provider          PaymentProvider
+  providerPaymentId String?
+  metadata          Json?
+  subscription      Subscription?   @relation(fields: [subscriptionId], references: [id])
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model StudyGoal {
+  id           String   @id @default(cuid())
+  userId       String
+  targetBand   Float
+  targetDate   DateTime
+  dailyMinutes Int      @default(60)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_goals")
+}
+
+model ReadingTest {
+  id              String           @id @default(cuid())
+  title           String
+  type            TestType         @default(ACADEMIC)
+  status          TestStatus       @default(DRAFT)
+  mockTests       MockTest[]
+  readingAttempts ReadingAttempt[]
+  passages        ReadingPassage[]
+
+  @@map("reading_tests")
+}
+
+model ReadingPassage {
+  id        String            @id @default(cuid())
+  testId    String
+  title     String
+  content   String
+  test      ReadingTest       @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questions ReadingQuestion[]
+
+  @@map("reading_passages")
+}
+
+model ReadingQuestion {
+  id            String         @id @default(cuid())
+  passageId     String
+  questionType  QuestionType
+  questionText  String
+  options       Json?
+  correctAnswer String
+  passage       ReadingPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+
+  @@map("reading_questions")
+}
+
+model ReadingAttempt {
+  id     String      @id @default(cuid())
+  userId String
+  testId String
+  score  Int?
+  band   Float?
+  test   ReadingTest @relation(fields: [testId], references: [id])
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reading_attempts")
+}
+
+model ListeningTest {
+  id                String             @id @default(cuid())
+  title             String
+  listeningAttempts ListeningAttempt[]
+  sections          ListeningSection[]
+  mockTests         MockTest[]
+
+  @@map("listening_tests")
+}
+
+model ListeningSection {
+  id        String              @id @default(cuid())
+  testId    String
+  audioUrl  String
+  questions ListeningQuestion[]
+  test      ListeningTest       @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@map("listening_sections")
+}
+
+model ListeningQuestion {
+  id            String           @id @default(cuid())
+  sectionId     String
+  questionText  String
+  correctAnswer String
+  section       ListeningSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@map("listening_questions")
+}
+
+model ListeningAttempt {
+  id     String        @id @default(cuid())
+  userId String
+  testId String
+  score  Int?
+  band   Float?
+  test   ListeningTest @relation(fields: [testId], references: [id])
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("listening_attempts")
+}
+
+model WritingPrompt {
+  id          String              @id @default(cuid())
+  task        WritingTask
+  title       String
+  instruction String
+  mockTests   MockTest[]
+  submissions WritingSubmission[]
+
+  @@map("writing_prompts")
+}
+
+model WritingSubmission {
+  id           String        @id @default(cuid())
+  userId       String
+  promptId     String
+  essay        String
+  wordCount    Int
+  overallBand  Float?
+  taskResponse Float?
+  feedback     Json?
+  coherence    Float?
+  grammar      Float?
+  lexical      Float?
+  prompt       WritingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("writing_submissions")
+}
+
+model SpeakingCueCard {
+  id          String               @id @default(cuid())
+  part        SpeakingPart
+  topic       String
+  instruction String
+  mockTests   MockTest[]
+  submissions SpeakingSubmission[]
+
+  @@map("speaking_cue_cards")
+}
+
+model SpeakingSubmission {
+  id            String          @id @default(cuid())
+  userId        String
+  cueCardId     String
+  audioUrl      String
+  transcript    String?
+  fluency       Float?
+  grammar       Float?
+  pronunciation Float?
+  vocabulary    Float?
+  cueCard       SpeakingCueCard @relation(fields: [cueCardId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("speaking_submissions")
+}
+
+model MockTest {
+  id                String            @id @default(cuid())
+  title             String
+  createdAt         DateTime          @default(now())
+  description       String?
+  listeningMinutes  Int               @default(40)
+  listeningTestId   String?
+  readingMinutes    Int               @default(60)
+  readingTestId     String?
+  speakingCueCardId String?
+  speakingMinutes   Int               @default(15)
+  status            TestStatus        @default(DRAFT)
+  type              TestType          @default(ACADEMIC)
+  updatedAt         DateTime          @updatedAt
+  writingMinutes    Int               @default(60)
+  writingPromptId   String?
+  sessions          MockTestSession[]
+  listeningTest     ListeningTest?    @relation(fields: [listeningTestId], references: [id])
+  readingTest       ReadingTest?      @relation(fields: [readingTestId], references: [id])
+  speakingCueCard   SpeakingCueCard?  @relation(fields: [speakingCueCardId], references: [id])
+  writingPrompt     WritingPrompt?    @relation(fields: [writingPromptId], references: [id])
+
+  @@map("mock_tests")
+}
+
+model MockTestSession {
+  id                 String         @id @default(cuid())
+  userId             String
+  mockTestId         String
+  status             MockTestStatus @default(IN_PROGRESS)
+  readingScore       Float?
+  listeningScore     Float?
+  writingScore       Float?
+  speakingScore      Float?
+  overallBand        Float?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  listeningAnswers   Json?
+  listeningDone      Boolean        @default(false)
+  listeningStartedAt DateTime?
+  readingAnswers     Json?
+  readingDone        Boolean        @default(false)
+  readingStartedAt   DateTime?
+  speakingAudioUrl   String?
+  speakingDone       Boolean        @default(false)
+  speakingFeedback   Json?
+  speakingStartedAt  DateTime?
+  updatedAt          DateTime       @updatedAt
+  writingDone        Boolean        @default(false)
+  writingEssay       String?
+  writingFeedback    Json?
+  writingStartedAt   DateTime?
+  mockTest           MockTest       @relation(fields: [mockTestId], references: [id])
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mock_test_sessions")
+}
+
+model Vocabulary {
+  id         String               @id @default(cuid())
+  word       String               @unique
+  meaning    String
+  savedWords SavedWord[]
+  progress   VocabularyProgress[]
+
+  @@map("vocabulary")
+}
+
+model VocabularyProgress {
+  id           String     @id @default(cuid())
+  userId       String
+  vocabularyId String
+  correctCount Int        @default(0)
+  easeFactor   Float      @default(2.5)
+  interval     Int        @default(0)
+  nextReview   DateTime   @default(now())
+  repetitions  Int        @default(0)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary   Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+  @@map("vocabulary_progress")
+}
+
+model UserAnalytics {
+  id            String @id @default(cuid())
+  userId        String @unique
+  readingBand   Float?
+  listeningBand Float?
+  writingBand   Float?
+  speakingBand  Float?
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_analytics")
+}
+
+model BandHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  overall   Float?
+  source    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("band_history")
+}
+
+model AiTutorSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_tutor_sessions")
+}
+
+model Notification {
+  id      String  @id @default(cuid())
+  userId  String
+  title   String
+  message String
+  isRead  Boolean @default(false)
+  type    String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+/// /////////////////////////////////////////////////
+/// /////////////////////////////////////////////////
+model CommunityPost {
+  id        String             @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  createdAt DateTime           @default(now())
+  isPinned  Boolean            @default(false)
+  updatedAt DateTime           @updatedAt
+  comments  CommunityComment[]
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmarks PostBookmark[]
+  likes     PostLike[]
+  reports   PostReport[]
+
+  @@map("community_posts")
+}
+
+model CommunityComment {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  content   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@map("community_comments")
+}
+
+model PostLike {
+  id     String        @id @default(cuid())
+  postId String
+  userId String
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+model PostBookmark {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_bookmarks")
+}
+
+model PostReport {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  reason    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_reports")
+}
+
+model LeaderboardEntry {
+  id          String @id @default(cuid())
+  userId      String @unique
+  weeklyScore Float  @default(0)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("leaderboard_entries")
+}
+
+model BlogPost {
+  id      String @id @default(cuid())
+  title   String
+  slug    String @unique
+  content String
+
+  @@map("blog_posts")
+}
+
+model AiTokenUsage {
+  id        String   @id @default(cuid())
+  userId    String?
+  feature   String
+  model     String
+  createdAt DateTime @default(now())
+  tokens    Int      @default(0)
+  cost      Float    @default(0)
+  sessionId String?
+
+  @@map("ai_token_usage")
+}
 
 enum Role {
   STUDENT
@@ -108,562 +613,4 @@ enum PostStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
-}
-
-////////////////////////////////////////////////////
-// USER SYSTEM
-////////////////////////////////////////////////////
-
-model User {
-  id       String  @id @default(cuid())
-  name     String
-  email    String  @unique
-  password String?
-  avatar   String?
-  role     Role    @default(STUDENT)
-
-  // OAuth
-  oauthProvider OAuthProvider?
-  oauthId       String?
-
-  targetBand   Float?
-  streak       Int       @default(0)
-  lastActiveAt DateTime?
-
-  // Email verification
-  emailVerified     Boolean   @default(false)
-  emailVerifyToken  String?
-  emailVerifyExpiry DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  profile      UserProfile?
-  subscription Subscription?
-
-  refreshTokens  RefreshToken[]
-  passwordResets PasswordReset[]
-
-  studyGoals StudyGoal[]
-
-  readingAttempts     ReadingAttempt[]
-  listeningAttempts   ListeningAttempt[]
-  writingSubmissions  WritingSubmission[]
-  speakingSubmissions SpeakingSubmission[]
-
-  mockSessions MockTestSession[]
-
-  analytics   UserAnalytics?
-  bandHistory BandHistory[]
-
-  notifications Notification[]
-
-  vocabularyProgress VocabularyProgress[]
-  savedWords         SavedWord[]
-
-  aiSessions AiTutorSession[]
-
-  communityPosts CommunityPost[]
-  comments       CommunityComment[]
-
-  payments Payment[]
-
-  leaderboard LeaderboardEntry?
-
-  @@map("users")
-}
-
-model SavedWord {
-  id           String   @id @default(cuid())
-  userId       String
-  vocabularyId String
-  notes        String?
-  createdAt    DateTime @default(now())
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id])
-
-  @@unique([userId, vocabularyId])
-}
-
-////////////////////////////////////////////////////
-// AUTH
-////////////////////////////////////////////////////
-
-model UserProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  bio      String?
-  country  String?
-  phone    String?
-  language String  @default("en")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique   // SHA-256 hash — never store raw token
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  revokedAt DateTime?           // null = active; set on logout / rotation
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("refresh_tokens")
-}
-
-model PasswordReset {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique   // SHA-256 hash of the raw token
-  used      Boolean  @default(false)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("password_resets")
-}
-
-////////////////////////////////////////////////////
-// SUBSCRIPTION
-////////////////////////////////////////////////////
-
-model Subscription {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  plan   SubscriptionPlan   @default(FREE)
-  status SubscriptionStatus @default(TRIAL)
-
-  startAt DateTime?
-  endAt   DateTime?
-
-  stripeCustomerId String?
-  stripeSubId      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  payments Payment[]
-
-  @@map("subscriptions")
-}
-
-model Payment {
-  id     String @id @default(cuid())
-  userId String
-
-  amount   Float
-  currency String @default("USD")
-
-  status   PaymentStatus   @default(PENDING)
-  provider PaymentProvider
-
-  providerPaymentId String?
-  metadata          Json?
-
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
-  subscriptionId String?
-
-  @@map("payments")
-}
-
-////////////////////////////////////////////////////
-// IELTS CORE MODELS
-////////////////////////////////////////////////////
-
-model StudyGoal {
-  id     String @id @default(cuid())
-  userId String
-
-  targetBand   Float
-  targetDate   DateTime
-  dailyMinutes Int      @default(60)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("study_goals")
-}
-
-////////////////////////////////////////////////////
-// READING
-////////////////////////////////////////////////////
-
-model ReadingTest {
-  id     String     @id @default(cuid())
-  title  String
-  type   TestType   @default(ACADEMIC)
-  status TestStatus @default(DRAFT)
-
-  passages        ReadingPassage[]
-  readingAttempts ReadingAttempt[]
-
-  @@map("reading_tests")
-}
-
-model ReadingPassage {
-  id      String @id @default(cuid())
-  testId  String
-  title   String
-  content String
-
-  test ReadingTest @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  questions ReadingQuestion[]
-
-  @@map("reading_passages")
-}
-
-model ReadingQuestion {
-  id        String @id @default(cuid())
-  passageId String
-
-  questionText  String
-  questionType  QuestionType
-  options       Json?
-  correctAnswer String
-
-  passage ReadingPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
-
-  @@map("reading_questions")
-}
-
-model ReadingAttempt {
-  id     String @id @default(cuid())
-  userId String
-  testId String
-
-  score Int?
-  band  Float?
-
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  test ReadingTest @relation(fields: [testId], references: [id])
-
-  @@map("reading_attempts")
-}
-
-////////////////////////////////////////////////////
-// LISTENING
-////////////////////////////////////////////////////
-
-model ListeningTest {
-  id    String @id @default(cuid())
-  title String
-
-  sections          ListeningSection[]
-  listeningAttempts ListeningAttempt[]
-
-  @@map("listening_tests")
-}
-
-model ListeningSection {
-  id       String @id @default(cuid())
-  testId   String
-  audioUrl String
-
-  test ListeningTest @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  questions ListeningQuestion[]
-
-  @@map("listening_sections")
-}
-
-model ListeningQuestion {
-  id        String @id @default(cuid())
-  sectionId String
-
-  questionText  String
-  correctAnswer String
-
-  section ListeningSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-
-  @@map("listening_questions")
-}
-
-model ListeningAttempt {
-  id     String @id @default(cuid())
-  userId String
-  testId String
-
-  score Int?
-  band  Float?
-
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  test ListeningTest @relation(fields: [testId], references: [id])
-
-  @@map("listening_attempts")
-}
-
-////////////////////////////////////////////////////
-// WRITING
-////////////////////////////////////////////////////
-
-model WritingPrompt {
-  id          String      @id @default(cuid())
-  task        WritingTask
-  title       String
-  instruction String
-
-  submissions WritingSubmission[]
-
-  @@map("writing_prompts")
-}
-
-model WritingSubmission {
-  id       String @id @default(cuid())
-  userId   String
-  promptId String
-
-  essay     String
-  wordCount Int
-
-  overallBand  Float?
-  taskResponse Float?
-  coherence    Float?
-  lexical      Float?
-  grammar      Float?
-
-  feedback Json?
-
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prompt WritingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-
-  @@map("writing_submissions")
-}
-
-////////////////////////////////////////////////////
-// SPEAKING
-////////////////////////////////////////////////////
-
-model SpeakingCueCard {
-  id          String       @id @default(cuid())
-  part        SpeakingPart
-  topic       String
-  instruction String
-
-  submissions SpeakingSubmission[]
-
-  @@map("speaking_cue_cards")
-}
-
-model SpeakingSubmission {
-  id        String @id @default(cuid())
-  userId    String
-  cueCardId String
-
-  audioUrl   String
-  transcript String?
-
-  fluency       Float?
-  pronunciation Float?
-  grammar       Float?
-  vocabulary    Float?
-
-  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cueCard SpeakingCueCard @relation(fields: [cueCardId], references: [id], onDelete: Cascade)
-
-  @@map("speaking_submissions")
-}
-
-////////////////////////////////////////////////////
-// MOCK TEST ENGINE
-////////////////////////////////////////////////////
-
-model MockTest {
-  id    String @id @default(cuid())
-  title String
-
-  sessions MockTestSession[]
-
-  @@map("mock_tests")
-}
-
-model MockTestSession {
-  id         String @id @default(cuid())
-  userId     String
-  mockTestId String
-
-  status MockTestStatus @default(IN_PROGRESS)
-
-  readingScore   Float?
-  listeningScore Float?
-  writingScore   Float?
-  speakingScore  Float?
-  overallBand    Float?
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mockTest MockTest @relation(fields: [mockTestId], references: [id])
-
-  @@map("mock_test_sessions")
-}
-
-////////////////////////////////////////////////////
-// VOCABULARY
-////////////////////////////////////////////////////
-
-model Vocabulary {
-  id      String @id @default(cuid())
-  word    String @unique
-  meaning String
-
-  progress   VocabularyProgress[]
-  savedWords SavedWord[]
-
-  @@map("vocabulary")
-}
-
-model VocabularyProgress {
-  id           String @id @default(cuid())
-  userId       String
-  vocabularyId String
-
-  correctCount Int @default(0)
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, vocabularyId])
-  @@map("vocabulary_progress")
-}
-
-////////////////////////////////////////////////////
-// ANALYTICS
-////////////////////////////////////////////////////
-
-model UserAnalytics {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  readingBand   Float?
-  listeningBand Float?
-  writingBand   Float?
-  speakingBand  Float?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_analytics")
-}
-
-model BandHistory {
-  id     String @id @default(cuid())
-  userId String
-
-  overall Float?
-  source  String?
-
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("band_history")
-}
-
-////////////////////////////////////////////////////
-// AI TUTOR
-////////////////////////////////////////////////////
-
-model AiTutorSession {
-  id     String @id @default(cuid())
-  userId String
-
-  title String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("ai_tutor_sessions")
-}
-
-////////////////////////////////////////////////////
-// NOTIFICATIONS
-////////////////////////////////////////////////////
-
-model Notification {
-  id     String @id @default(cuid())
-  userId String
-
-  type    String
-  title   String
-  message String
-  isRead  Boolean @default(false)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
-}
-
-////////////////////////////////////////////////////
-// COMMUNITY
-////////////////////////////////////////////////////
-
-model CommunityPost {
-  id     String @id @default(cuid())
-  userId String
-
-  title   String
-  content String
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("community_posts")
-}
-
-model CommunityComment {
-  id     String @id @default(cuid())
-  postId String
-  userId String
-
-  content String
-  user    User   @relation(fields: [userId], references: [id])
-
-  @@map("community_comments")
-}
-
-////////////////////////////////////////////////////
-// LEADERBOARD
-////////////////////////////////////////////////////
-
-model LeaderboardEntry {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  weeklyScore Float @default(0)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("leaderboard_entries")
-}
-
-////////////////////////////////////////////////////
-// BLOG
-////////////////////////////////////////////////////
-
-model BlogPost {
-  id      String @id @default(cuid())
-  title   String
-  slug    String @unique
-  content String
-
-  @@map("blog_posts")
-}
-
-////////////////////////////////////////////////////
-// AI USAGE
-////////////////////////////////////////////////////
-
-model AiTokenUsage {
-  id      String  @id @default(cuid())
-  userId  String?
-  feature String
-  model   String
-  tokens  Int     @default(0)
-
-  createdAt DateTime @default(now())
-
-  @@map("ai_token_usage")
 }
