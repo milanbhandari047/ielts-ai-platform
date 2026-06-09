@@ -188,3 +188,76 @@ export function useAuth() {
     loginWithGoogle,
   };
 }
+
+// import { create } from "zustand";
+// import { persist, createJSONStorage } from "zustand/middleware";
+// import type { AuthUser } from "@/types/auth.types";
+
+// // ─── Cookie helpers ─────────────────────────────────────────────────────────
+// // The middleware reads a lightweight "has-session" cookie to decide whether
+// // a route is protected. We sync it here so localStorage and cookie stay
+// // consistent without ever putting the JWT in a cookie.
+
+// function setSessionCookie() {
+//   if (typeof document === "undefined") return;
+//   document.cookie = "has-session=1; path=/; SameSite=Lax";
+// }
+
+// function clearSessionCookie() {
+//   if (typeof document === "undefined") return;
+//   document.cookie =
+//     "has-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+// }
+
+// // ─── Types ──────────────────────────────────────────────────────────────────
+
+// interface AuthState {
+//   user: AuthUser | null;
+//   isAuthenticated: boolean;
+//   isLoading: boolean;
+//   isHydrated: boolean;
+
+//   setUser: (user: AuthUser) => void;
+//   setLoading: (loading: boolean) => void;
+//   setHydrated: (hydrated: boolean) => void;
+//   clearAuth: () => void;
+// }
+
+// // ─── Store ──────────────────────────────────────────────────────────────────
+
+// export const useAuthStore = create<AuthState>()(
+//   persist(
+//     (set) => ({
+//       user: null,
+//       isAuthenticated: false,
+//       isLoading: false,
+//       isHydrated: false,
+
+//       setUser: (user) => {
+//         setSessionCookie();
+//         set({ user, isAuthenticated: true, isLoading: false });
+//       },
+
+//       setLoading: (isLoading) => set({ isLoading }),
+
+//       setHydrated: (isHydrated) => set({ isHydrated }),
+
+//       clearAuth: () => {
+//         clearSessionCookie();
+//         set({ user: null, isAuthenticated: false });
+//       },
+//     }),
+//     {
+//       name: "auth-storage",
+//       storage: createJSONStorage(() => localStorage),
+//       partialize: (state) => ({ user: state.user }),
+//       onRehydrateStorage: () => (state) => {
+//         if (state) {
+//           state.isAuthenticated = !!state.user;
+//           if (state.user) setSessionCookie();
+//           state.setHydrated(true);
+//         }
+//       },
+//     }
+//   )
+// );
