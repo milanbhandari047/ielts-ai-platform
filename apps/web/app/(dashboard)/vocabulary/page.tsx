@@ -1,35 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { SectionLoader } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
-import type { DailyWords, VocabularyProgress } from "@/types";
-import { vocabularyService } from "@/services/vocabular.service";
+import { useVocabularyStore } from "@/store/vocabulary.store";
+import TopicExplorer from "@/components/vocabulary/TopicExplorer";
+import { BookOpen, Brain, Trophy } from "lucide-react";
 
 export default function VocabularyPage() {
-  const [daily, setDaily] = useState<DailyWords | null>(null);
-  const [progress, setProgress] = useState<VocabularyProgress[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { daily, stats, loadingDashboard, fetchDashboard } =
+    useVocabularyStore();
 
   useEffect(() => {
-    Promise.all([
-      vocabularyService.getDailyWords(),
-      vocabularyService.getMyProgress(),
-    ])
-      .then(([d, p]) => {
-        setDaily(d);
-        setProgress(p.items);
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  if (isLoading) return <SectionLoader />;
+  if (loadingDashboard || !daily || !stats) {
+    return <SectionLoader />;
+  }
 
-  const masteredCount = progress.filter((p) => p.correctCount >= 3).length;
+  const allDailyWords = [
+    ...(daily.dueReviews ?? []),
+    ...(daily.newWords ?? []),
+  ];
+
+  const total = allDailyWords.length;
 
   return (
     <div className="space-y-8">
+      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Vocabulary Builder</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -37,158 +36,131 @@ export default function VocabularyPage() {
         </p>
       </div>
 
-      {/* Stats row */}
+      {/* STATS */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          {
-            label: "Words Mastered",
-            value: masteredCount,
-            icon: "🎓",
-            color: "from-emerald-500 to-teal-500",
-          },
-          {
-            label: "Words in Progress",
-            value: progress.length - masteredCount,
-            icon: "📖",
-            color: "from-blue-500 to-indigo-500",
-          },
-          {
-            label: "Daily Target",
-            value: `${daily?.completed ?? 0}/${daily?.total ?? 10}`,
-            icon: "🎯",
-            color: "from-orange-500 to-amber-500",
-          },
-        ].map(({ label, value, icon, color }) => (
-          <div
-            key={label}
-            className={`rounded-2xl bg-gradient-to-br ${color} p-5 text-white`}
-          >
-            <p className="text-2xl font-black">{value}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium opacity-90">
-              <span>{icon}</span>
-              {label}
-            </p>
+        <Link href="/vocabulary/mastered">
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 p-5 text-white shadow-md hover:scale-[1.02] transition">
+            <Trophy className="mb-2" />
+            <p className="text-3xl font-black">{stats.totalLearned ?? 0}</p>
+            <p className="text-sm opacity-90">Words Mastered</p>
           </div>
-        ))}
+        </Link>
+
+        <Link href="/vocabulary/saved">
+          <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 p-5 text-white shadow-md hover:scale-[1.02] transition">
+            <BookOpen className="mb-2" />
+            <p className="text-3xl font-black">{stats.totalSaved ?? 0}</p>
+            <p className="text-sm opacity-90">Saved Words</p>
+          </div>
+        </Link>
+
+        <Link href="/vocabulary/review">
+          <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 p-5 text-white shadow-md hover:scale-[1.02] transition">
+            <Brain className="mb-2" />
+            <p className="text-3xl font-black">{stats.dueCount ?? 0}</p>
+            <p className="text-sm opacity-90">Due for Review</p>
+          </div>
+        </Link>
       </div>
 
-      {/* Practice modes */}
+      {/* PRACTICE MODES */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/vocabulary/flashcards"
-          className="group flex flex-col gap-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 transition hover:shadow-md hover:ring-indigo-100"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-2xl group-hover:bg-indigo-100">
-            🃏
+        <Link href="/vocabulary/flashcards">
+          <div className="group rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 hover:shadow-lg hover:ring-indigo-200 transition">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100">
+                🃏
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Flashcards
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Memorise words with spaced repetition cards
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 text-sm font-medium text-indigo-600">
+              Start learning →
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              Flashcards
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Review words with interactive flip cards. Perfect for
-              memorisation.
-            </p>
-          </div>
-          <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-indigo-600 group-hover:gap-2 transition-all">
-            Start reviewing →
-          </span>
         </Link>
 
-        <Link
-          href="/vocabulary/quiz"
-          className="group flex flex-col gap-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 transition hover:shadow-md hover:ring-orange-100"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-2xl group-hover:bg-orange-100">
-            ✏️
+        <Link href="/vocabulary/quiz">
+          <div className="group rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 hover:shadow-lg hover:ring-orange-200 transition">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-100">
+                ✏️
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Quiz Mode
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Test yourself with MCQs and track progress
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 text-sm font-medium text-orange-600">
+              Take quiz →
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Quiz Mode</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Test yourself with multiple-choice questions. Track your accuracy.
-            </p>
-          </div>
-          <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-orange-600 group-hover:gap-2 transition-all">
-            Take a quiz →
-          </span>
         </Link>
       </div>
-
-      {/* Daily words preview */}
-      {daily && (
+      {/* DAILY WORDS */}
+      {total > 0 && (
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">
-              Today&apos;s Words
-            </h2>
-            <span className="text-xs text-gray-400">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </span>
-          </div>
+          <h2 className="text-sm font-semibold mb-4 text-gray-900">
+            Today’s Words
+          </h2>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            {daily.words.slice(0, 6).map((w) => (
+            {allDailyWords.slice(0, 6).map((w) => (
               <div
                 key={w.id}
-                className="flex items-start gap-3 rounded-xl border border-gray-100 p-3"
+                className="rounded-xl border p-4 hover:bg-gray-50 transition"
               >
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
-                  {w.word[0].toUpperCase()}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {w.word}
-                  </p>
-                  <p className="text-xs text-gray-500">{w.meaning}</p>
+                <div className="flex items-start justify-between">
+                  <p className="font-semibold text-gray-900">{w.word}</p>
+
+                  {w.isReview && (
+                    <span className="text-[10px] px-2 py-0.5 bg-orange-100 text-orange-600 rounded-full">
+                      review
+                    </span>
+                  )}
                 </div>
+
+                <p className="text-xs text-gray-500 mt-1">{w.meaning}</p>
+
+                {w.topic && (
+                  <p className="text-[10px] mt-2 text-blue-600">
+                    Topic: {w.topic}
+                  </p>
+                )}
+
+                {w.example && (
+                  <p className="text-[10px] mt-1 text-gray-500 italic">
+                    “{w.example}”
+                  </p>
+                )}
               </div>
             ))}
           </div>
-          <Link
-            href="/vocabulary/flashcards"
-            className="mt-4 block text-center text-sm font-medium text-indigo-600 hover:underline"
-          >
-            Study all {daily.total} words →
-          </Link>
         </div>
       )}
 
-      {/* Progress table */}
-      {progress.length > 0 && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <h2 className="mb-4 text-sm font-semibold text-gray-900">
-            My Progress
-          </h2>
-          <div className="space-y-2">
-            {progress.slice(0, 10).map((p) => (
-              <div key={p.vocabularyId} className="flex items-center gap-4">
-                <span className="w-32 truncate text-sm font-medium text-gray-800">
-                  {p.word}
-                </span>
-                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      p.correctCount >= 3
-                        ? "bg-emerald-500"
-                        : p.correctCount >= 1
-                        ? "bg-blue-500"
-                        : "bg-gray-300"
-                    )}
-                    style={{
-                      width: `${Math.min((p.correctCount / 5) * 100, 100)}%`,
-                    }}
-                  />
-                </div>
-                <span className="w-16 text-right text-xs text-gray-400">
-                  {p.correctCount >= 3 ? "✓ Mastered" : `${p.correctCount}/5`}
-                </span>
-              </div>
-            ))}
-          </div>
+      {/* 🔥 TOPIC EXPLORER (INTEGRATED PROPERLY) */}
+      <TopicExplorer />
+
+      {/* EMPTY STATE */}
+      {total === 0 && (
+        <div className="rounded-2xl bg-emerald-50 p-6 text-center ring-1 ring-emerald-100">
+          <p className="text-lg font-bold text-emerald-800">
+            🎉 All caught up for today!
+          </p>
+          <p className="mt-1 text-sm text-emerald-600">
+            No words due for review.
+          </p>
         </div>
       )}
     </div>

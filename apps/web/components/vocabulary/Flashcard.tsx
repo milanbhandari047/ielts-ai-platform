@@ -1,29 +1,42 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useVocabularyStore } from "@/store/mocktest.store";
-import type { VocabularyWord } from "@/types";
+import { useVocabularyStore } from "@/store/vocabulary.store";
+import type { VocabularyWord } from "@/types/vocabulary";
 
 interface FlashcardProps {
   word: VocabularyWord;
   index: number;
   total: number;
+  /** Called when the user toggles save; isSaved = the NEW desired state */
+  onSaveToggle?: (wordId: string, isSaved: boolean) => void;
 }
 
-export function Flashcard({ word, index, total }: FlashcardProps) {
+export function Flashcard({
+  word,
+  index,
+  total,
+  onSaveToggle,
+}: FlashcardProps) {
   const { isFlipped, flipCard, nextCard, prevCard, savedWordIds, toggleSaved } =
     useVocabularyStore();
 
   const isSaved = savedWordIds.has(word.id);
 
+  const handleSave = () => {
+    // Toggle optimistically in the store, then notify parent
+    toggleSaved(word.id);
+    onSaveToggle?.(word.id, !isSaved);
+  };
+
   return (
     <div className="flex flex-col items-center gap-6">
-      {/* Progress */}
+      {/* Progress bar */}
       <div className="flex w-full max-w-lg items-center gap-3">
         <span className="text-sm text-gray-500">
           {index + 1} / {total}
         </span>
-        <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
           <div
             className="h-full rounded-full bg-indigo-500 transition-all"
             style={{ width: `${((index + 1) / total) * 100}%` }}
@@ -53,18 +66,12 @@ export function Flashcard({ word, index, total }: FlashcardProps) {
               Word
             </p>
             <p className="text-4xl font-black">{word.word}</p>
-            {word.difficulty && (
-              <span
-                className={cn(
-                  "mt-4 rounded-full px-3 py-0.5 text-xs font-medium",
-                  word.difficulty === "EASY" &&
-                    "bg-green-400/30 text-green-100",
-                  word.difficulty === "MEDIUM" &&
-                    "bg-yellow-400/30 text-yellow-100",
-                  word.difficulty === "HARD" && "bg-red-400/30 text-red-100"
-                )}
-              >
-                {word.difficulty}
+            {/* Show review streak if progress exists */}
+            {word.progress && (
+              <span className="mt-4 rounded-full bg-white/20 px-3 py-0.5 text-xs font-medium">
+                {word.progress.correctCount >= 3
+                  ? "✓ Mastered"
+                  : `Streak: ${word.progress.correctCount}`}
               </span>
             )}
             <p className="mt-6 text-xs opacity-60">Tap to reveal meaning</p>
@@ -84,21 +91,11 @@ export function Flashcard({ word, index, total }: FlashcardProps) {
             <p className="text-center text-lg font-semibold text-gray-900">
               {word.meaning}
             </p>
-            {word.example && (
-              <p className="mt-3 text-center text-sm italic text-gray-500">
-                &ldquo;{word.example}&rdquo;
-              </p>
-            )}
-            {word.synonyms && word.synonyms.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1 justify-center">
-                {word.synonyms.map((s) => (
-                  <span
-                    key={s}
-                    className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
-                  >
-                    {s}
-                  </span>
-                ))}
+            {/* SM-2 info */}
+            {word.progress && (
+              <div className="mt-4 flex gap-3 text-xs text-gray-400">
+                <span>Interval: {word.progress.interval}d</span>
+                <span>Ease: {word.progress.easeFactor.toFixed(2)}</span>
               </div>
             )}
           </div>
@@ -108,7 +105,7 @@ export function Flashcard({ word, index, total }: FlashcardProps) {
       {/* Controls */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => prevCard()}
+          onClick={prevCard}
           disabled={index === 0}
           className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-40"
         >
@@ -116,7 +113,7 @@ export function Flashcard({ word, index, total }: FlashcardProps) {
         </button>
 
         <button
-          onClick={() => toggleSaved(word.id)}
+          onClick={handleSave}
           className={cn(
             "flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium transition",
             isSaved

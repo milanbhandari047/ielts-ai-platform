@@ -1,64 +1,64 @@
 import { QuizQuestion, QuizResult, AppNotification } from "@/types";
 import { create } from "zustand";
 
-// ─── Vocabulary Store ─────────────────────────────────────────────────────────
-interface VocabularyState {
-  currentCardIndex: number;
-  isFlipped: boolean;
-  quizQuestions: QuizQuestion[];
-  quizAnswers: Record<string, string>; // { [vocabularyId]: selectedAnswer }
-  quizResult: QuizResult | null;
-  savedWordIds: Set<string>;
+// // ─── Vocabulary Store ─────────────────────────────────────────────────────────
+// interface VocabularyState {
+//   currentCardIndex: number;
+//   isFlipped: boolean;
+//   quizQuestions: QuizQuestion[];
+//   quizAnswers: Record<string, string>; // { [vocabularyId]: selectedAnswer }
+//   quizResult: QuizResult | null;
+//   savedWordIds: Set<string>;
 
-  setCardIndex: (i: number) => void;
-  nextCard: (total: number) => void;
-  prevCard: () => void;
-  flipCard: () => void;
-  resetFlip: () => void;
-  setQuizQuestions: (qs: QuizQuestion[]) => void;
-  setQuizAnswer: (vocabId: string, answer: string) => void;
-  setQuizResult: (result: QuizResult) => void;
-  setSavedWordIds: (ids: string[]) => void;
-  toggleSaved: (id: string) => void;
-  resetQuiz: () => void;
-}
+//   setCardIndex: (i: number) => void;
+//   nextCard: (total: number) => void;
+//   prevCard: () => void;
+//   flipCard: () => void;
+//   resetFlip: () => void;
+//   setQuizQuestions: (qs: QuizQuestion[]) => void;
+//   setQuizAnswer: (vocabId: string, answer: string) => void;
+//   setQuizResult: (result: QuizResult) => void;
+//   setSavedWordIds: (ids: string[]) => void;
+//   toggleSaved: (id: string) => void;
+//   resetQuiz: () => void;
+// }
 
-export const useVocabularyStore = create<VocabularyState>((set) => ({
-  currentCardIndex: 0,
-  isFlipped: false,
-  quizQuestions: [],
-  quizAnswers: {},
-  quizResult: null,
-  savedWordIds: new Set(),
+// export const useVocabularyStore = create<VocabularyState>((set) => ({
+//   currentCardIndex: 0,
+//   isFlipped: false,
+//   quizQuestions: [],
+//   quizAnswers: {},
+//   quizResult: null,
+//   savedWordIds: new Set(),
 
-  setCardIndex: (i) => set({ currentCardIndex: i, isFlipped: false }),
-  nextCard: (total) =>
-    set((s) => ({
-      currentCardIndex: Math.min(s.currentCardIndex + 1, total - 1),
-      isFlipped: false,
-    })),
-  prevCard: () =>
-    set((s) => ({
-      currentCardIndex: Math.max(s.currentCardIndex - 1, 0),
-      isFlipped: false,
-    })),
-  flipCard: () => set((s) => ({ isFlipped: !s.isFlipped })),
-  resetFlip: () => set({ isFlipped: false }),
-  setQuizQuestions: (quizQuestions) =>
-    set({ quizQuestions, quizAnswers: {}, quizResult: null }),
-  setQuizAnswer: (vocabId, answer) =>
-    set((s) => ({ quizAnswers: { ...s.quizAnswers, [vocabId]: answer } })),
-  setQuizResult: (quizResult) => set({ quizResult }),
-  setSavedWordIds: (ids) => set({ savedWordIds: new Set(ids) }),
-  toggleSaved: (id) =>
-    set((s) => {
-      const next = new Set(s.savedWordIds);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return { savedWordIds: next };
-    }),
-  resetQuiz: () =>
-    set({ quizQuestions: [], quizAnswers: {}, quizResult: null }),
-}));
+//   setCardIndex: (i) => set({ currentCardIndex: i, isFlipped: false }),
+//   nextCard: (total) =>
+//     set((s) => ({
+//       currentCardIndex: Math.min(s.currentCardIndex + 1, total - 1),
+//       isFlipped: false,
+//     })),
+//   prevCard: () =>
+//     set((s) => ({
+//       currentCardIndex: Math.max(s.currentCardIndex - 1, 0),
+//       isFlipped: false,
+//     })),
+//   flipCard: () => set((s) => ({ isFlipped: !s.isFlipped })),
+//   resetFlip: () => set({ isFlipped: false }),
+//   setQuizQuestions: (quizQuestions) =>
+//     set({ quizQuestions, quizAnswers: {}, quizResult: null }),
+//   setQuizAnswer: (vocabId, answer) =>
+//     set((s) => ({ quizAnswers: { ...s.quizAnswers, [vocabId]: answer } })),
+//   setQuizResult: (quizResult) => set({ quizResult }),
+//   setSavedWordIds: (ids) => set({ savedWordIds: new Set(ids) }),
+//   toggleSaved: (id) =>
+//     set((s) => {
+//       const next = new Set(s.savedWordIds);
+//       next.has(id) ? next.delete(id) : next.add(id);
+//       return { savedWordIds: next };
+//     }),
+//   resetQuiz: () =>
+//     set({ quizQuestions: [], quizAnswers: {}, quizResult: null }),
+// }));
 
 // ─── Mock Test Store ──────────────────────────────────────────────────────────
 type MockSection = "LISTENING" | "READING" | "WRITING" | "SPEAKING";

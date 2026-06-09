@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useVocabularyStore } from "@/store/mocktest.store";
-import { vocabularyService } from "@/services/vocabular.service";
+import { useVocabularyStore } from "@/store/vocabulary.store";
+import { vocabularyService } from "@/services/vocabulary.service";
 import { SectionLoader } from "@/components/ui/spinner";
+import type { QuizResult } from "@/types/vocabulary";
 
 export default function QuizPage() {
   const {
@@ -22,33 +23,84 @@ export default function QuizPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
 
-  useEffect(() => {
+  const loadQuestions = async () => {
+    setIsLoading(true);
     resetQuiz();
-    vocabularyService
-      .getQuizQuestions(10)
-      .then(setQuizQuestions)
-      .finally(() => setIsLoading(false));
+    setCurrentQ(0);
+
+    try {
+      const data = await vocabularyService.getQuizQuestions(10);
+      setQuizQuestions(data);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadQuestions();
   }, []);
 
-  const handleAnswer = (option: string) => {
-    if (quizResult) return;
-    setQuizAnswer(quizQuestions[currentQ].id, option);
+  const currentQuestion = quizQuestions[currentQ];
+
+  const handleAnswer = (optionMeaning: string) => {
+    if (quizResult || !currentQuestion) return;
+
+    setQuizAnswer(currentQuestion.id, optionMeaning);
+
     setTimeout(() => {
-      if (currentQ < quizQuestions.length - 1) setCurrentQ((c) => c + 1);
-    }, 400);
+      setCurrentQ((c) => Math.min(c + 1, quizQuestions.length - 1));
+    }, 300);
   };
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    const answers = Object.entries(quizAnswers).map(
-      ([vocabularyId, answer]) => ({
-        vocabularyId,
-        answer,
-      })
-    );
+
     try {
-      const result = await vocabularyService.submitQuiz(answers);
+      const payload = Object.entries(quizAnswers).map(
+        ([vocabularyId, answer]) => ({
+          vocabularyId,
+          answer,
+        })
+      );
+
+      await vocabularyService.submitQuiz(payload);
+
+      const answers = quizQuestions.map((q) => {
+        const chosen = quizAnswers[q.id] ?? "";
+
+        const correct = chosen === q.correctAnswer;
+
+        return {
+          wordId: q.id,
+          correct,
+          correctAnswer: q.correctAnswer,
+          yourAnswer: chosen,
+        };
+      });
+
+      const correctCount = answers.filter((a) => a.correct).length;
+
+      const result: QuizResult = {
+        correct: correctCount,
+        total: quizQuestions.length,
+        score: Math.round((correctCount / quizQuestions.length) * 100),
+        answers,
+      };
+
+      /**
+       * SM-2 QUALITY MAPPING (IMPROVED)
+       * correct → 4 (good recall)
+       * wrong → 2 (weak recall, not failure)
+       */
+      await Promise.allSettled(
+        quizQuestions.map((q) => {
+          const isCorrect = quizAnswers[q.id] === q.correctAnswer;
+
+          return vocabularyService.submitReview(q.id, isCorrect ? 4 : 2);
+        })
+      );
+
       setQuizResult(result);
     } finally {
       setIsSubmitting(false);
@@ -56,28 +108,45 @@ export default function QuizPage() {
   };
 
   if (isLoading) return <SectionLoader />;
-  if (quizQuestions.length === 0)
+
+  if (!quizQuestions.length) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-gray-500">
-        No quiz questions available.
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-gray-500">
+          No quiz questions available.
+          <br />
+          Learn more words to unlock quizzes.
+        </p>
+
+        <Link
+          href="/vocabulary/flashcards"
+          className="text-sm font-medium text-indigo-600 hover:underline"
+        >
+          Study flashcards →
+        </Link>
       </div>
     );
+  }
 
   const answeredCount = Object.keys(quizAnswers).length;
   const allAnswered = answeredCount === quizQuestions.length;
 
-  // ── Results screen ──────────────────────────────────────────────────────────
+  // ================= RESULT SCREEN =================
   if (quizResult) {
-    const pct = Math.round(quizResult.score);
+    const pct = quizResult.score;
+
     return (
       <div className="mx-auto max-w-lg space-y-6">
+        {/* SCORE */}
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-100">
           <p className="text-5xl font-black text-gray-900">
             {quizResult.correct}/{quizResult.total}
           </p>
+
           <p className="mt-1 text-lg font-semibold text-gray-600">
-            {pct}% correct
+            {pct}% score
           </p>
+
           <div
             className={cn(
               "mt-4 inline-block rounded-full px-4 py-1.5 text-sm font-semibold",
@@ -89,177 +158,173 @@ export default function QuizPage() {
             )}
           >
             {pct >= 80
-              ? "🎉 Excellent!"
+              ? "Excellent 🎉"
               : pct >= 60
-              ? "👍 Good job!"
-              : "📚 Keep practising!"}
+              ? "Good 👍"
+              : "Keep practicing 📚"}
           </div>
         </div>
 
-        {/* Review */}
+        {/* REVIEW */}
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <h2 className="mb-4 text-sm font-semibold text-gray-900">
-            Answer Review
-          </h2>
+          <h2 className="mb-4 text-sm font-semibold">Review Answers</h2>
+
           <div className="space-y-3">
-            {quizResult.answers.map((a, i) => {
-              const q = quizQuestions.find((q) => q.id === a.wordId);
+            {quizResult.answers.map((a) => {
+              const q = quizQuestions.find((x) => x.id === a.wordId);
+
               return (
                 <div
                   key={a.wordId}
                   className={cn(
-                    "flex items-start gap-2 rounded-lg border p-3",
+                    "rounded-lg border p-3",
                     a.correct
                       ? "border-green-200 bg-green-50"
                       : "border-red-200 bg-red-50"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white",
-                      a.correct ? "bg-green-500" : "bg-red-500"
-                    )}
-                  >
-                    {a.correct ? "✓" : "✗"}
-                  </span>
-                  <div className="text-sm">
-                    <p className="font-semibold text-gray-800">{q?.word}</p>
-                    <p className="text-gray-600">
-                      Correct:{" "}
-                      <span className="font-medium text-green-700">
-                        {a.correctAnswer}
-                      </span>
+                  <p className="font-semibold">{q?.word}</p>
+
+                  {/* NEW: topic + example support */}
+                  {q?.word && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {q?.word && `Topic: ${(q as any).topic || "General"}`}
                     </p>
-                    {!a.correct && (
-                      <p className="text-gray-500">
-                        Your answer:{" "}
-                        <span className="text-red-600">
-                          {quizAnswers[a.wordId]}
-                        </span>
-                      </p>
-                    )}
-                  </div>
+                  )}
+
+                  <p className="text-sm text-gray-600 mt-1">
+                    Correct:{" "}
+                    <span className="text-green-700 font-medium">
+                      {a.correctAnswer}
+                    </span>
+                  </p>
+
+                  {!a.correct && (
+                    <p className="text-sm text-red-600">
+                      Your answer: {a.yourAnswer}
+                    </p>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
+        {/* ACTIONS */}
         <div className="flex gap-3">
           <button
-            onClick={() => {
-              resetQuiz();
-              setCurrentQ(0);
-              setIsLoading(true);
-              vocabularyService
-                .getQuizQuestions(10)
-                .then(setQuizQuestions)
-                .finally(() => setIsLoading(false));
-            }}
+            onClick={loadQuestions}
             className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            Try Again
+            Retry
           </button>
+
           <Link
             href="/vocabulary"
-            className="flex-1 rounded-xl border border-gray-200 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-xl border py-3 text-center text-sm font-medium hover:bg-gray-50"
           >
-            Back to Vocabulary
+            Back
           </Link>
         </div>
       </div>
     );
   }
 
-  // ── Quiz screen ─────────────────────────────────────────────────────────────
-  const q = quizQuestions[currentQ];
-  const selectedAnswer = quizAnswers[q.id];
+  // ================= QUIZ SCREEN =================
+  if (!currentQuestion) return null;
+
+  const selectedAnswer = quizAnswers[currentQuestion.id];
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <div className="flex items-center justify-between">
-        <Link
-          href="/vocabulary"
-          className="text-sm text-gray-500 hover:text-gray-800"
-        >
-          ← Vocabulary
-        </Link>
-        <span className="text-sm text-gray-500">
+      {/* HEADER */}
+      <div className="flex justify-between text-sm text-gray-500">
+        <Link href="/vocabulary">← Back</Link>
+        <span>
           {currentQ + 1} / {quizQuestions.length}
         </span>
       </div>
 
-      {/* Progress */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      {/* PROGRESS */}
+      <div className="h-2 w-full rounded-full bg-gray-100">
         <div
-          className="h-full rounded-full bg-indigo-500 transition-all"
-          style={{ width: `${((currentQ + 1) / quizQuestions.length) * 100}%` }}
+          className="h-full bg-indigo-500 transition-all"
+          style={{
+            width: `${((currentQ + 1) / quizQuestions.length) * 100}%`,
+          }}
         />
       </div>
 
-      {/* Question */}
+      {/* QUESTION */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">
-          What does this word mean?
+        <p className="text-3xl font-black text-gray-900">
+          {currentQuestion.word}
         </p>
-        <p className="text-3xl font-black text-gray-900">{q.word}</p>
+
+        {/* NEW: topic display */}
+        {(currentQuestion as any).topic && (
+          <p className="text-xs text-gray-500 mt-2">
+            Topic: {(currentQuestion as any).topic}
+          </p>
+        )}
       </div>
 
-      {/* Options */}
+      {/* OPTIONS */}
       <div className="space-y-3">
-        {q.options.map((opt) => {
-          const isSelected = selectedAnswer === opt;
-          const isCorrect = opt === q.correctAnswer;
+        {currentQuestion.options.map((opt) => {
+          const isSelected = selectedAnswer === opt.meaning;
+          const isCorrect = opt.meaning === currentQuestion.correctAnswer;
           const showResult = !!selectedAnswer;
+
           return (
             <button
-              key={opt}
-              onClick={() => handleAnswer(opt)}
+              key={opt.id}
+              onClick={() => handleAnswer(opt.meaning)}
               disabled={!!selectedAnswer}
               className={cn(
-                "w-full rounded-xl border px-4 py-3.5 text-left text-sm font-medium transition",
-                !showResult &&
-                  "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50",
+                "w-full rounded-xl border px-4 py-3 text-left text-sm font-medium",
+                !showResult && "hover:bg-indigo-50",
                 showResult &&
                   isSelected &&
                   isCorrect &&
-                  "border-green-400 bg-green-50 text-green-800",
+                  "bg-green-50 border-green-400",
                 showResult &&
                   isSelected &&
                   !isCorrect &&
-                  "border-red-400 bg-red-50 text-red-800",
+                  "bg-red-50 border-red-400",
                 showResult &&
                   !isSelected &&
                   isCorrect &&
-                  "border-green-300 bg-green-50 text-green-700",
+                  "bg-green-50 border-green-300",
                 showResult &&
                   !isSelected &&
                   !isCorrect &&
-                  "border-gray-100 bg-gray-50 text-gray-400"
+                  "bg-gray-50 text-gray-400"
               )}
             >
-              {opt}
+              {opt.meaning}
             </button>
           );
         })}
       </div>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
+      {/* FOOTER */}
+      <div className="flex justify-between">
         <button
           onClick={() => setCurrentQ((c) => Math.max(0, c - 1))}
           disabled={currentQ === 0}
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          className="border px-4 py-2 rounded-lg text-sm"
         >
-          ← Back
+          Back
         </button>
+
         {allAnswered ? (
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="bg-indigo-600 text-white px-6 py-2 rounded-xl"
           >
-            {isSubmitting ? "Submitting…" : "See Results"}
+            {isSubmitting ? "Submitting..." : "Submit"}
           </button>
         ) : (
           <span className="text-xs text-gray-400">

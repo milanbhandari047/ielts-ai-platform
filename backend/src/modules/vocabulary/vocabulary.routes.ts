@@ -26,4 +26,7 @@ router.post("/review", ctrl.submitReview.bind(ctrl));
 // ── Stats ──────────────────────────────────
 router.get("/stats", ctrl.getStats.bind(ctrl));
 
+router.get("/mastered", ctrl.getMastered.bind(ctrl));
+router.get("/reviews", ctrl.getDueReviews.bind(ctrl));
+
 export default router;

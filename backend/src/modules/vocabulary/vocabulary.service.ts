@@ -3,7 +3,9 @@ import { PrismaClient, Prisma } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /**
- * SM-2 Algorithm
+ * =========================
+ * SM-2 Algorithm (optimized)
+ * =========================
  */
 function sm2(
   quality: number,
@@ -11,20 +13,21 @@ function sm2(
   easeFactor: number,
   interval: number
 ) {
-  if (quality >= 3) {
-    if (repetitions === 0) interval = 1;
-    else if (repetitions === 1) interval = 6;
-    else interval = Math.round(interval * easeFactor);
-
+  if (quality < 3) {
+    repetitions = 0;
+    interval = 1;
+  } else {
     repetitions++;
 
     easeFactor =
       easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
 
     if (easeFactor < 1.3) easeFactor = 1.3;
-  } else {
-    repetitions = 0;
-    interval = 1;
+
+    if (repetitions === 1) interval = 1;
+    else if (repetitions === 2) interval = 2;
+    else if (repetitions === 3) interval = 4;
+    else interval = Math.min(Math.round(interval * easeFactor), 10);
   }
 
   const nextReview = new Date();
@@ -33,12 +36,20 @@ function sm2(
   return { repetitions, easeFactor, interval, nextReview };
 }
 
+// Example
+const result = sm2(5, 0, 2.5, 0);
+console.log(result);
+/**
+ * =========================
+ * VOCABULARY SERVICE
+ * =========================
+ */
 export class VocabularyService {
   constructor(private db = prisma) {}
 
-  /**
-   * Get vocabulary list
-   */
+  // -------------------------
+  // GET VOCABULARY LIST
+  // -------------------------
   async getVocabulary(userId: string, page = 1, limit = 20, search?: string) {
     page = Math.max(1, page);
     limit = Math.min(100, limit);
@@ -66,11 +77,9 @@ export class VocabularyService {
           savedWords: {
             where: { userId },
             take: 1,
-            select: { id: true },
           },
         },
       }),
-
       this.db.vocabulary.count({ where }),
     ]);
 
@@ -79,6 +88,8 @@ export class VocabularyService {
         id: v.id,
         word: v.word,
         meaning: v.meaning,
+        example: v.example,
+        topic: v.topic,
         isSaved: v.savedWords.length > 0,
         progress: v.progress[0] ?? null,
       })),
@@ -88,9 +99,9 @@ export class VocabularyService {
     };
   }
 
-  /**
-   * Daily words
-   */
+  // -------------------------
+  // DAILY WORDS
+  // -------------------------
   async getDailyWords(userId: string) {
     const now = new Date();
 
@@ -126,21 +137,29 @@ export class VocabularyService {
 
     return {
       dueReviews: dueReviews.map((p) => ({
-        ...p.vocabulary,
+        id: p.vocabulary.id,
+        word: p.vocabulary.word,
+        meaning: p.vocabulary.meaning,
+        example: p.vocabulary.example,
+        topic: p.vocabulary.topic,
         progressId: p.id,
         isReview: true,
       })),
       newWords: newWords.map((w) => ({
-        ...w,
+        id: w.id,
+        word: w.word,
+        meaning: w.meaning,
+        example: w.example,
+        topic: w.topic,
         progressId: null,
         isReview: false,
       })),
     };
   }
 
-  /**
-   * Flashcards
-   */
+  // -------------------------
+  // FLASHCARDS
+  // -------------------------
   async getFlashcards(userId: string, count = 20) {
     const saved = await this.db.savedWord.findMany({
       where: { userId },
@@ -161,14 +180,16 @@ export class VocabularyService {
       id: s.vocabulary.id,
       word: s.vocabulary.word,
       meaning: s.vocabulary.meaning,
+      example: s.vocabulary.example,
+      topic: s.vocabulary.topic,
       notes: s.notes ?? null,
       progress: s.vocabulary.progress[0] ?? null,
     }));
   }
 
-  /**
-   * Quiz generator
-   */
+  // -------------------------
+  // QUIZ
+  // -------------------------
   async getQuiz(userId: string, count = 10) {
     const userProgress = await this.db.vocabularyProgress.findMany({
       where: { userId },
@@ -192,7 +213,7 @@ export class VocabularyService {
       );
 
       return {
-        id: p.id,
+        id: p.vocabulary.id,
         word: p.vocabulary.word,
         correctAnswer: p.vocabulary.meaning,
         options: options.map((o) => ({
@@ -203,13 +224,11 @@ export class VocabularyService {
     });
   }
 
-  /**
-   * Submit review
-   */
+  // -------------------------
+  // REVIEW (SM-2)
+  // -------------------------
   async submitReview(userId: string, vocabularyId: string, quality: number) {
-    if (quality < 0 || quality > 5) {
-      throw new Error("INVALID_QUALITY");
-    }
+    if (quality < 0 || quality > 5) throw new Error("INVALID_QUALITY");
 
     const existing = await this.db.vocabularyProgress.findUnique({
       where: {
@@ -217,11 +236,12 @@ export class VocabularyService {
       },
     });
 
-    const repetitions = existing?.repetitions ?? 0;
-    const easeFactor = existing?.easeFactor ?? 2.5;
-    const interval = existing?.interval ?? 0;
-
-    const result = sm2(quality, repetitions, easeFactor, interval);
+    const result = sm2(
+      quality,
+      existing?.repetitions ?? 0,
+      existing?.easeFactor ?? 2.5,
+      existing?.interval ?? 0
+    );
 
     const progress = existing
       ? await this.db.vocabularyProgress.update({
@@ -232,10 +252,7 @@ export class VocabularyService {
             correctCount: {
               increment: quality >= 3 ? 1 : 0,
             },
-            repetitions: result.repetitions,
-            easeFactor: result.easeFactor,
-            interval: result.interval,
-            nextReview: result.nextReview,
+            ...result,
           },
         })
       : await this.db.vocabularyProgress.create({
@@ -243,22 +260,16 @@ export class VocabularyService {
             userId,
             vocabularyId,
             correctCount: quality >= 3 ? 1 : 0,
-            repetitions: result.repetitions,
-            easeFactor: result.easeFactor,
-            interval: result.interval,
-            nextReview: result.nextReview,
+            ...result,
           },
         });
 
-    return {
-      ...result,
-      correctCount: progress.correctCount,
-    };
+    return { ...result, correctCount: progress.correctCount };
   }
 
-  /**
-   * Toggle save word
-   */
+  // -------------------------
+  // SAVE / UNSAVE
+  // -------------------------
   async toggleSave(userId: string, vocabularyId: string, notes?: string) {
     const existing = await this.db.savedWord.findUnique({
       where: {
@@ -267,12 +278,9 @@ export class VocabularyService {
     });
 
     if (existing) {
-      await this.db.savedWord.delete({
-        where: {
-          userId_vocabularyId: { userId, vocabularyId },
-        },
+      await this.db.savedWord.deleteMany({
+        where: { userId, vocabularyId },
       });
-
       return { saved: false };
     }
 
@@ -287,21 +295,14 @@ export class VocabularyService {
     return { saved: true };
   }
 
-  /**
-   * Saved words
-   */
+  // -------------------------
+  // SAVED WORDS
+  // -------------------------
   async getSavedWords(userId: string) {
     const saved = await this.db.savedWord.findMany({
       where: { userId },
       include: {
-        vocabulary: {
-          include: {
-            progress: {
-              where: { userId },
-              take: 1,
-            },
-          },
-        },
+        vocabulary: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -310,15 +311,16 @@ export class VocabularyService {
       id: s.vocabulary.id,
       word: s.vocabulary.word,
       meaning: s.vocabulary.meaning,
+      example: s.vocabulary.example,
+      topic: s.vocabulary.topic,
       notes: s.notes ?? null,
       savedAt: s.createdAt,
-      progress: s.vocabulary.progress[0] ?? null,
     }));
   }
 
-  /**
-   * Stats
-   */
+  // -------------------------
+  // STATS
+  // -------------------------
   async getStats(userId: string) {
     const [totalSaved, totalLearned, dueCount] = await Promise.all([
       this.db.savedWord.count({ where: { userId } }),
@@ -330,10 +332,55 @@ export class VocabularyService {
       }),
     ]);
 
-    return {
-      totalSaved,
-      totalLearned,
-      dueCount,
-    };
+    return { totalSaved, totalLearned, dueCount };
+  }
+
+  // -------------------------
+  // MASTERED WORDS
+  // -------------------------
+  async getMasteredWords(userId: string) {
+    const mastered = await this.db.vocabularyProgress.findMany({
+      where: {
+        userId,
+        correctCount: { gte: 3 },
+      },
+      include: { vocabulary: true },
+      orderBy: { correctCount: "desc" },
+    });
+
+    return mastered.map((p) => ({
+      id: p.vocabulary.id,
+      word: p.vocabulary.word,
+      meaning: p.vocabulary.meaning,
+      example: p.vocabulary.example,
+      topic: p.vocabulary.topic,
+      correctCount: p.correctCount,
+      repetitions: p.repetitions,
+      nextReview: p.nextReview,
+    }));
+  }
+
+  // -------------------------
+  // DUE REVIEWS
+  // -------------------------
+  async getDueReviews(userId: string) {
+    const reviews = await this.db.vocabularyProgress.findMany({
+      where: {
+        userId,
+        nextReview: { lte: new Date() },
+      },
+      include: { vocabulary: true },
+      orderBy: { nextReview: "asc" },
+    });
+
+    return reviews.map((p) => ({
+      id: p.vocabulary.id,
+      word: p.vocabulary.word,
+      meaning: p.vocabulary.meaning,
+      example: p.vocabulary.example,
+      topic: p.vocabulary.topic,
+      nextReview: p.nextReview,
+      correctCount: p.correctCount,
+    }));
   }
 }

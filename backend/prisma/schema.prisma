@@ -349,6 +349,8 @@ model Vocabulary {
   id         String               @id @default(cuid())
   word       String               @unique
   meaning    String
+  example    String?
+  topic      String?
   savedWords SavedWord[]
   progress   VocabularyProgress[]
 

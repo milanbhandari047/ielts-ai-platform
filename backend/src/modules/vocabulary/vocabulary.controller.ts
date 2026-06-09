@@ -3,7 +3,9 @@ import { VocabularyService } from "./vocabulary.service.js";
 
 const svc = new VocabularyService();
 
+// --------------------
 // helpers
+// --------------------
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -13,34 +15,45 @@ function num(value: unknown, fallback: number): number {
   return isNaN(n) ? fallback : n;
 }
 
-// safe userId extractor
 function getUserId(req: Request): string | null {
   const user = req.user as any;
   return user?.id || user?.userId || null;
 }
 
+// --------------------
+// CONTROLLER
+// --------------------
 export class VocabularyController {
+  // =====================
+  // DAILY WORDS
+  // =====================
   async getDailyWords(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const data = await svc.getDailyWords(userId);
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("getDailyWords error:", e);
       res.status(500).json({ success: false, message: e.message });
     }
   }
 
+  // =====================
+  // ALL WORDS
+  // =====================
   async getAllWords(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const data = await svc.getVocabulary(
         userId,
@@ -49,27 +62,27 @@ export class VocabularyController {
         str(req.query.search)
       );
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("getAllWords error:", e);
       res.status(500).json({ success: false, message: e.message });
     }
   }
 
+  // =====================
+  // SAVED WORDS
+  // =====================
   async getSaved(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const data = await svc.getSavedWords(userId);
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("getSaved error:", e);
       res.status(500).json({ success: false, message: e.message });
@@ -79,15 +92,17 @@ export class VocabularyController {
   async saveWord(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const vocabularyId = str(req.body.vocabularyId);
-      if (!vocabularyId) {
+      if (!vocabularyId)
         return res.status(400).json({
           success: false,
           message: "vocabularyId is required",
         });
-      }
 
       const result = await svc.toggleSave(userId, vocabularyId);
 
@@ -101,15 +116,17 @@ export class VocabularyController {
   async unsaveWord(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const vocabularyId = str(req.params.vocabularyId);
-      if (!vocabularyId) {
+      if (!vocabularyId)
         return res.status(400).json({
           success: false,
           message: "vocabularyId is required",
         });
-      }
 
       const result = await svc.toggleSave(userId, vocabularyId);
 
@@ -120,19 +137,21 @@ export class VocabularyController {
     }
   }
 
+  // =====================
+  // QUIZ
+  // =====================
   async getQuiz(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const count = num(req.query.count, 10);
-
       const data = await svc.getQuiz(userId, count);
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("getQuiz error:", e);
       res.status(500).json({ success: false, message: e.message });
@@ -143,7 +162,7 @@ export class VocabularyController {
     try {
       res.json({
         success: true,
-        message: "Quiz submit handled in frontend or extend backend logic",
+        message: "Handled on frontend (or extend backend scoring)",
         data: req.body.answers,
       });
     } catch (e: any) {
@@ -151,43 +170,91 @@ export class VocabularyController {
     }
   }
 
+  // =====================
+  // REVIEW (SM-2)
+  // =====================
   async submitReview(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const vocabularyId = str(req.body.vocabularyId);
       const quality = num(req.body.quality, 0);
 
-      if (!vocabularyId) {
+      if (!vocabularyId)
         return res.status(400).json({
           success: false,
           message: "vocabularyId is required",
         });
-      }
 
-      const result = await svc.submitReview(userId, vocabularyId, quality);
+      const data = await svc.submitReview(userId, vocabularyId, quality);
 
-      res.json({ success: true, data: result });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("submitReview error:", e);
       res.status(400).json({ success: false, message: e.message });
     }
   }
 
+  // =====================
+  // STATS
+  // =====================
   async getStats(req: Request, res: Response) {
     try {
       const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const data = await svc.getStats(userId);
 
-      res.json({
-        success: true,
-        data,
-      });
+      res.json({ success: true, data });
     } catch (e: any) {
       console.error("getStats error:", e);
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  // =====================
+  // MASTERED WORDS
+  // =====================
+  async getMastered(req: Request, res: Response) {
+    try {
+      const userId = getUserId(req);
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+
+      const data = await svc.getMasteredWords(userId);
+
+      res.json({ success: true, data });
+    } catch (e: any) {
+      console.error("getMastered error:", e);
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  // =====================
+  // DUE REVIEWS
+  // =====================
+  async getDueReviews(req: Request, res: Response) {
+    try {
+      const userId = getUserId(req);
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+
+      const data = await svc.getDueReviews(userId);
+
+      res.json({ success: true, data });
+    } catch (e: any) {
+      console.error("getDueReviews error:", e);
       res.status(500).json({ success: false, message: e.message });
     }
   }
