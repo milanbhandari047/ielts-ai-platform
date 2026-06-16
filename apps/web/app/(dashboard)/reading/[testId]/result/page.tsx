@@ -1,114 +1,125 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { readingService } from "@/services/reading.service";
+import Link from "next/link";
 import { useReadingStore } from "@/store/reading.store";
-import { TimerCountdown } from "@/components/ui/TimerCountdown";
-import { SectionLoader } from "@/components/ui/spinner";
-import { PassageViewer } from "@/components/reading/PassageViewer";
-import { QuestionPanel } from "@/components/reading/QuestonPanel";
+import { BandBadge } from "@/components/ui/BandBadge";
+import { cn } from "@/lib/utils";
 
-export default function ReadingTestPage() {
+export default function ReadingResultPage() {
   const params = useParams();
   const testId = params.testId as string;
   const router = useRouter();
 
-  const {
-    currentTest,
-    answers,
-    timeLeft,
-    isSubmitting,
-    setTest,
-    setTimeLeft,
-    setSubmitting,
-    setResult,
-    reset,
-  } = useReadingStore();
+  const { result, currentTest, answers, reset } = useReadingStore();
 
-  // Load test
   useEffect(() => {
-    reset();
-    readingService.getTest(testId).then((test) => setTest(test));
-  }, [testId]);
+    if (!result) router.replace(`/reading/${testId}`);
+  }, [result, router, testId]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!currentTest || isSubmitting) return;
-    setSubmitting(true);
-    try {
-      const result = await readingService.submitTest({
-        testId: currentTest.id,
-        answers,
-        timeTaken: 3600 - timeLeft,
-      });
-      setResult(result);
-      router.push(`/reading/${testId}/result`);
-    } catch {
-      setSubmitting(false);
-    }
-  }, [currentTest, answers, timeLeft, isSubmitting]);
+  if (!result || !currentTest) return null;
 
-  if (!currentTest) return <SectionLoader />;
+  const pct = Math.round((result.score / result.total) * 100);
 
-  // Flatten all questions for the navigator
   const allQuestions = currentTest.passages.flatMap((p) => p.questions);
-  const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3 shadow-sm">
-        <div>
-          <h1 className="text-sm font-semibold text-gray-900">
-            {currentTest.title}
-          </h1>
-          <p className="text-xs text-gray-500">
-            {answeredCount} / {allQuestions.length} answered
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5">
-            <svg
-              className="h-4 w-4 text-gray-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <TimerCountdown
-              seconds={timeLeft}
-              onTick={setTimeLeft}
-              onExpire={handleSubmit}
-            />
-          </div>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+    <div className="mx-auto max-w-2xl space-y-8">
+      {/* Score card */}
+      <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-100">
+        <p className="mb-1 text-sm font-medium text-gray-500">Reading Score</p>
+
+        <BandBadge band={result.band} size="lg" className="mx-auto" />
+
+        <p className="mt-4 text-4xl font-bold text-gray-900">
+          {result.score} / {result.total}
+        </p>
+
+        <p className="text-sm text-gray-500">{pct}% correct</p>
+
+        <div className="mt-4 flex justify-center gap-3">
+          <Link
+            href="/reading"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            {isSubmitting ? "Submitting…" : "Submit Test"}
-          </button>
+            Back to tests
+          </Link>
+
+          <Link
+            href={`/reading/${testId}`}
+            onClick={reset}
+            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+          >
+            Retake test
+          </Link>
         </div>
       </div>
 
-      {/* Split view */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left — passages */}
-        <div className="w-1/2 overflow-y-auto border-r border-gray-200 bg-white">
-          {currentTest.passages.map((passage, i) => (
-            <PassageViewer key={passage.id} passage={passage} index={i} />
-          ))}
-        </div>
+      {/* Answer review */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+        <h2 className="mb-4 text-sm font-semibold text-gray-900">
+          Answer Review
+        </h2>
 
-        {/* Right — questions */}
-        <div className="w-1/2 overflow-y-auto bg-gray-50">
-          <QuestionPanel passages={currentTest.passages} />
+        <div className="space-y-3">
+          {allQuestions.map((q, i) => {
+            const review = result.correctAnswers[q.id];
+            const userAnswer = answers[q.id] ?? "—";
+            const isCorrect = review?.correct ?? false;
+
+            return (
+              <div
+                key={q.id}
+                className={cn(
+                  "rounded-lg border p-3",
+                  isCorrect
+                    ? "border-green-200 bg-green-50"
+                    : "border-red-200 bg-red-50"
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <span
+                    className={cn(
+                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                      isCorrect
+                        ? "bg-green-600 text-white"
+                        : "bg-red-500 text-white"
+                    )}
+                  >
+                    {isCorrect ? "✓" : "✗"}
+                  </span>
+
+                  <div className="text-sm">
+                    <p className="font-medium text-gray-800">
+                      Q{i + 1}. {q.questionText}
+                    </p>
+
+                    <p className="mt-1 text-gray-600">
+                      Your answer:{" "}
+                      <span
+                        className={cn(
+                          "font-medium",
+                          isCorrect ? "text-green-700" : "text-red-700"
+                        )}
+                      >
+                        {userAnswer}
+                      </span>
+                    </p>
+
+                    {!isCorrect && (
+                      <p className="text-gray-600">
+                        Correct:{" "}
+                        <span className="font-medium text-green-700">
+                          {review?.correctAnswer}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

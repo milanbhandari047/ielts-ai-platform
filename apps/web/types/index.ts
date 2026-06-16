@@ -90,17 +90,47 @@ export interface WeakSkill {
 // ─── Reading ─────────────────────────────────────────────────────────────────
 
 export type QuestionType =
+  // Multiple Choice
   | "MULTIPLE_CHOICE"
+  | "MULTIPLE_CHOICE_MULTI"
+
+  // True/False
   | "TRUE_FALSE_NOT_GIVEN"
-  | "FILL_IN_THE_BLANK"
+  | "YES_NO_NOT_GIVEN"
+
+  // Matching
   | "MATCH_HEADINGS"
   | "MATCH_INFORMATION"
-  | "SHORT_ANSWER"
+  | "MATCH_FEATURES"
+  | "MATCH_SENTENCE_ENDINGS"
+
+  // Completion
+  | "FILL_IN_THE_BLANK"
   | "SENTENCE_COMPLETION"
   | "SUMMARY_COMPLETION"
-  | "DIAGRAM_LABELLING"
-  | "NOTE_COMPLETION";
+  | "SUMMARY_COMPLETION_BANK"
+  | "NOTE_COMPLETION"
+  | "TABLE_COMPLETION"
+  | "FLOW_CHART_COMPLETION"
+  | "FORM_COMPLETION"
+  | "TIMELINE_COMPLETION"
 
+  // Labelling
+  | "DIAGRAM_LABELLING"
+  | "MAP_LABELLING"
+  | "PLAN_LABELLING"
+
+  // Short Answer
+  | "SHORT_ANSWER"
+
+  // Selection
+  | "LIST_SELECTION"
+
+  // Classification
+  | "CLASSIFICATION"
+
+  // Generic
+  | "CATEGORY_MATCHING";
 export interface ReadingQuestion {
   id: string;
   questionText: string;

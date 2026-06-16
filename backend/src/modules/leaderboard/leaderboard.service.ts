@@ -53,20 +53,26 @@ export async function getWeeklyLeaderboardService(currentUserId: string) {
 }
 
 export async function getMyRankService(userId: string) {
-  const all = await prisma.leaderboardEntry.findMany({
-    orderBy: {
-      weeklyScore: "desc",
-    },
+  // First check if this user has an entry at all
+  const myEntry = await prisma.leaderboardEntry.findUnique({
+    where: { userId },
   });
 
-  const myIndex = all.findIndex((e) => e.userId === userId);
+  // Count how many users score strictly higher → that's rank - 1
+  const rank = myEntry
+    ? (await prisma.leaderboardEntry.count({
+        where: {
+          weeklyScore: { gt: myEntry.weeklyScore },
+        },
+      })) + 1
+    : null; // null = user has no points yet, not ranked
 
-  const myEntry = all[myIndex];
+  const total = await prisma.leaderboardEntry.count();
 
   return {
-    rank: myIndex >= 0 ? myIndex + 1 : all.length + 1,
-
+    rank,
     weeklyScore: myEntry?.weeklyScore ?? 0,
+    total, // send total so frontend can calculate "Top X% of N students" correctly
   };
 }
 

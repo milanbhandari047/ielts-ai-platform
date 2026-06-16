@@ -16,6 +16,7 @@ import aiTutorRoutes from "./modules/ai-tutor/ai-tutor.routes.js";
 import mockTestRoutes from "./modules/mock-test/mock-test.routes.js";
 import notificationRoutes from "./modules/notifications/notificaions.routes.js";
 import communityRoutes from "./modules/community/community.routes.js";
+import leaderboardRouter from "./modules/leaderboard/leaderboard.routes.js";
 
 import {
   errorMiddleware,
@@ -46,6 +47,7 @@ app.use("/api/mock-test", mockTestRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/ai-tutor", aiTutorRoutes);
+app.use("/api/leaderboard", leaderboardRouter);
 
 // Error handling
 app.use(notFoundMiddleware);

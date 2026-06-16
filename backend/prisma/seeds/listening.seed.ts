@@ -9,7 +9,7 @@ export async function seedListening(prisma: PrismaClient) {
         create: [
           {
             audioUrl:
-              "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+              "https://cdnapisec.kaltura.com/p/5394802/embedPlaykitJs/uiconf_id/53315462?iframeembed=true&entry_id=1_p3x3lbo7&config%5Bprovider%5D=%7B%22widgetId%22%3A%221_bgzmga33%22%7D&config%5Bplayback%5D=%7B%22startTime%22%3A0%7D",
 
             questions: {
               create: [

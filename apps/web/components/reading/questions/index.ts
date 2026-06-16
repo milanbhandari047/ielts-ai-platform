@@ -1,0 +1,11 @@
+export { QuestionRenderer } from "./QuestionRenderer";
+export { MultipleChoiceQuestion } from "./MultipleChoiceQuestion";
+export { MultipleChoiceMultiQuestion } from "./MultipleChoiceMultiQuestion";
+export { TrueFalseQuestion } from "./TrueFalseQuestion";
+export { MatchingQuestion } from "./MatchingQuestion";
+export { CompletionQuestion } from "./CompletionQuestion";
+export { DiagramLabelQuestion } from "./DiagramLabelQuestion";
+export { MapLabelQuestion } from "./MapLabelQuestion";
+export { PlanLabelQuestion } from "./PlanLabelQuestion";
+export { ShortAnswerQuestion } from "./ShortAnswerQuestion";
+export type { QuestionProps } from "./types";

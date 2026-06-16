@@ -82,6 +82,8 @@ export class SpeakingService {
           pronunciation: evaluation.pronunciation,
           grammar: evaluation.grammar,
           vocabulary: evaluation.vocabulary,
+          // feedback: evaluation.feedback
+          // suggestions: evaluation.suggestions,
         },
       });
 
